@@ -27,6 +27,8 @@ WHAT STAYS
   "lustrous", keep it -- you are adding to their writing, never simplifying it.
 - The length, or a little more. Never shorter.
 
+{{IMPROVEMENTS}}
+
 {{SHARED_RULES}}
 
 {{LEVEL_BLOCK}}

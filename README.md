@@ -79,6 +79,11 @@ an official marking scheme and should not be read as a predicted grade.** It is 
 consistent second opinion, and it is most useful for the things it points at: the
 sentences it lists, the tense slips it catches, the paragraph that does two jobs at once.
 
+The **improved rewrite** is the one place where the two models differ noticeably. On High
+Quality it is a genuine model answer — a new opening, added detail, stronger verbs. On Low
+Quality it applies the specific fixes the marking found but does less of its own writing.
+The **minimal correction** is reliable on both.
+
 The handwriting is read by a machine, and it does make mistakes. Check the **Transcript**
 tab against the page before taking a language deduction seriously — it opens first for
 that reason, and the report has a *Notes on the reading* section where the model flags

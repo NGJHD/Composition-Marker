@@ -308,12 +308,51 @@ def parse_score(report: str):
 # stage 3 - the corrected versions, generated on demand
 # ---------------------------------------------------------------------------
 
+_SECTION_RE = re.compile(
+    r"^##\s+(What to work on|Sentences to improve)\s*$(.*?)(?=^##\s|\Z)",
+    re.MULTILINE | re.DOTALL)
+
+
+def improvements_from_report(job: Job) -> str:
+    """The changes the marking call already decided on, for the rewrite to apply.
+
+    The improved rewrite is the hardest thing asked of the model: decide what is
+    weak in a piece of writing, then fix it, at a fixed level, without making it
+    worse. Asked cold it either hands the composition back or -- worse -- runs
+    out of ideas and simplifies it.
+
+    But that judgement has already been made, minutes earlier, by the marking
+    call: with thinking on, it named the weak sentences and wrote a stronger
+    version of each. Handing those back turns an open-ended writing task into a
+    mechanical one, which is what the small model is actually good at.
+
+    Best effort. A missing or unparseable report costs the extra grounding and
+    nothing else -- the prompt still stands on its own.
+    """
+    path = _paths(job)["report"]
+    try:
+        report = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    found = [m.group(0).strip() for m in _SECTION_RE.finditer(report)]
+    if not found:
+        return ""
+    return (
+        "IMPROVEMENTS ALREADY IDENTIFIED IN THIS COMPOSITION\n\n"
+        "These were worked out when the composition was marked. Apply every "
+        "one of them, and make the same kind of change wherever else it "
+        "applies.\n\n" + "\n\n".join(found)
+    )
+
+
 def correct(job: Job, server: llm.LlamaServer, cfg: dict, composition: str,
             kind: str) -> str:
     prompt = llm.fill(
         llm.load_prompt("correct_%s" % kind),
         level_block=levels.expectations_block(job.level, job.language),
         topic_block=_topic_block(job),
+        improvements=(improvements_from_report(job) if kind == "improved"
+                      else ""),
         language_instruction=CORRECT_LANGUAGE_INSTRUCTION.get(
             job.language, CORRECT_LANGUAGE_INSTRUCTION["en"]),
         composition=composition,
@@ -328,7 +367,37 @@ def correct(job: Job, server: llm.LlamaServer, cfg: dict, composition: str,
         stage="correct-%s" % kind,
     )
     calibration.record(job.model_key, "correct", time.time() - started)
-    return _clean_page(text)
+    return _keep_title(composition, _clean_page(text))
+
+
+def _keep_title(original: str, rewritten: str) -> str:
+    """Put the composition's title back if the model dropped it.
+
+    Both prompts say to keep it and both models drop it perhaps half the time,
+    reading the first line as a heading to be stripped rather than as part of
+    the composition. Losing it matters more than it looks: the title is often
+    the topic, and a corrected version handed back without one no longer
+    matches the page it is meant to sit beside.
+
+    Only fires on something that actually looks like a title -- one short line,
+    no sentence-ending punctuation -- and only when the rewrite does not
+    already open with it.
+    """
+    lines = [ln.strip() for ln in original.strip().splitlines() if ln.strip()]
+    if not lines or not rewritten:
+        return rewritten
+    title = lines[0]
+    if len(title) > 80 or len(title.split()) > 12:
+        return rewritten
+    if re.search(r"[.!?。！？]\s*$", title):
+        return rewritten           # a sentence, not a title
+
+    first = rewritten.strip().splitlines()[0].strip()
+    # A model that kept the title sometimes recapitalises it, so compare
+    # loosely before deciding it is missing.
+    if first.lower().strip(" .") == title.lower().strip(" ."):
+        return rewritten
+    return "%s\n\n%s" % (title, rewritten.strip())
 
 
 # ---------------------------------------------------------------------------

@@ -498,16 +498,60 @@ differed, but only in a word or two, which is the same fault a shade less visibl
 is not a plumbing bug (prompt hashes and output hashes were logged and confirmed distinct
 per call); it is the prompts collapsing into each other.
 
-`correct_improved.txt` now opens by saying that the corrected version already exists and
-that its own output must not come out the same, requires **one deliberate improvement in
-craft per paragraph**, and says explicitly what to do when the composition already exceeds
-its level: bring the weakest paragraph up to the best one rather than handing it back. The
-length floor changed from "not double it" to "at least as long as the original" — the
-improved rewrite had been coming back *shorter* than the piece it was improving.
+Fixing it took four attempts, and the failures are worth recording because three of them
+were mine, not the model's:
+
+1. **Told it the two must differ, with a craft requirement per paragraph.** They differed
+   — and at Primary 2 the rewrite *simplified the child's writing to match the level*:
+   "a willowy woman with long, lustrous hair" came back as "a woman with long hair". The
+   level was acting as a ceiling on words the child had already used correctly.
+2. **Added "never make it weaker": don't simplify, don't delete, don't shorten.** Now the
+   safest way to comply with every rule was to change nothing, so it handed the
+   composition back untouched — byte-identical to the minimal correction again. A prompt
+   built of prohibitions has inaction as its safest compliance.
+3. **Turned the prohibitions into six mandatory, checkable actions** (rewrite the first
+   sentence, rewrite the last, add two sentences of detail, three stronger verbs, three
+   varied openers, fix every error). Better — it did the first one. It did not do the
+   other five.
+
+Then the useful question: is this the prompt or the model? Same prompt, `Q4_K_M`:
+
+> The sky blazed red outside. Waiters darted around the bustling restaurant… My tummy
+> rumbled loudly as I leafed through the menu… We were having a **whale** of a time…
+> promised to **turn over** a new leaf.
+
+New opening, added sensory detail, stronger verbs throughout, the ending rewritten, and
+it repaired two idioms the child had mangled — while keeping "famished", "lustrous",
+"profusely" and "chastised". That is the document this feature is supposed to produce.
+**So the prompt was adequate and IQ2_XXS was the limit.**
+
+4. **Ground the rewrite in the marking report.** The judgement the rewrite needs has
+   already been made minutes earlier by the marking call, *with thinking on*: it named
+   the weak sentences and wrote a stronger version of each. `improvements_from_report`
+   lifts the "What to work on" and "Sentences to improve" sections out of the report on
+   disk and hands them to the rewrite as changes to apply. An open-ended writing task
+   becomes a mechanical one, which is what the small model is good at.
+
+With that, IQ2_XXS applies the identified fixes it had been ignoring — "a whole of a
+time" → "a great time", "willowy women" → "woman", "promised to turn a new leaf" — and
+often rewrites the opening as well. It is still short of Q4_K_M, and it is variable
+between runs. That is the honest state: **the improved rewrite is the one feature where
+the low-quality model is materially weaker**, and the README should not pretend
+otherwise.
+
+Two smaller things fixed alongside:
+
+- The length floor changed from "not double it" to "at least as long as the original".
+  The rewrite had been coming back *shorter* than the piece it was improving.
+- **The title kept disappearing.** Both prompts say to keep it; both models drop it
+  perhaps half the time, reading the first line as a heading to strip. `_keep_title`
+  puts it back — deterministically, only when the first line actually looks like a title
+  and the rewrite does not already open with it. Same class of fix as `_unwrap`: where a
+  requirement is mechanical, do it in code rather than asking harder.
 
 Worth saying plainly: the level was set two or three years below the writing. The app
-should behave well anyway, and now does, but the marking will be most useful at the level
-the child is actually working at.
+should behave well anyway, and now does, but the marking is most useful at the level the
+child is actually working at.
 
 ### 7.2 "73%" and "about 0s left" at the same moment
 

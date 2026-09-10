@@ -331,12 +331,23 @@ Primary 5 piece marked at Primary 2, say — "rewrite this to a good standard fo
 level" and "correct the mistakes" become the same instruction, and the two documents come
 back near-identical or, once observed, byte-identical below the title.
 
-So the improved prompt states outright that the corrected version already exists, that
-its own output must differ by more than corrected errors, and that **every paragraph must
-show at least one deliberate improvement in craft**. It is also told what to do when the
-piece is already above its level: find the weakest paragraph and bring it up to the best
-one, rather than handing the composition back. Its length floor is the original, never
-shorter — cutting the child's material is not an improvement.
+So the improved prompt states outright that the corrected version already exists and that
+its own output must differ by more than corrected errors, then gives **six mandatory,
+checkable changes** rather than a list of prohibitions. That distinction matters: a prompt
+built of "never do X" has *inaction* as its safest compliance, and an earlier version of
+this one duly handed the composition back untouched.
+
+Two hard rules sit under it. The level is a **floor, not a ceiling** — never write down to
+it, never replace a word the child already used correctly with a simpler one, never come
+back shorter. And **the rewrite is grounded in the marking report**: the "What to work on"
+and "Sentences to improve" sections are lifted off disk and handed to the rewrite as
+changes to apply. That judgement was already made by a thinking-enabled call minutes
+earlier, and reusing it turns an open-ended writing task into a mechanical one — which is
+what the small model can actually do.
+
+**The title is restored in code, not asked for in the prompt.** Both models drop it about
+half the time, reading the first line as a heading to strip. Where a requirement is
+mechanical, do it mechanically.
 
 Both are text-only calls with thinking off.
 
