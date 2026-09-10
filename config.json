@@ -12,7 +12,7 @@
     "port": 8080,
     "startup_timeout_s": 240,
     "max_transcribe_tokens": 2000,
-    "max_mark_tokens": 6000,
+    "max_mark_tokens": 12000,
     "max_correct_tokens": 4000
   },
   "thinking": {

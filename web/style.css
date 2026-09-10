@@ -224,6 +224,13 @@ input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); outli
    speaker tables, column one here is a row number and columns two and three
    are whole sentences that must be free to wrap. */
 
+/* The criteria table is the exception. Its first three columns are a label, a
+   mark and a band number, none of which should ever wrap -- "26 / 40" split
+   over two lines is unreadable -- while the comment takes whatever is left. */
+.doc table.marks td:nth-child(-n+3),
+.doc table.marks th:nth-child(-n+3) { white-space: nowrap; width: 1%; }
+.doc table.marks td:nth-child(4) { width: auto; }
+
 /* ---- errors, hints, notes ---- */
 
 .error, .fail-msg { color: var(--danger); }
@@ -321,3 +328,29 @@ input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); outli
   margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line);
   font-size: 12.5px; color: var(--ink-soft); line-height: 1.5;
 }
+
+/* ---- full-size page viewer ---- */
+
+/* Darker than the About sheet's backdrop: this is for reading handwriting, so
+   everything except the page should get out of the way. */
+#viewer { background: rgba(12, 14, 17, 0.88); padding: 16px; }
+.viewer-inner {
+  display: flex; flex-direction: column; gap: 10px;
+  max-width: 100%; max-height: 100%;
+}
+.viewer-bar { display: flex; align-items: center; gap: 10px; }
+.viewer-title { color: #f2f5f8; font-size: 14px; font-weight: 600; margin-right: auto; }
+.viewer-bar .btn { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.25); color: #f2f5f8; }
+.viewer-bar .btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.45); }
+.viewer-bar .iconbtn { color: #f2f5f8; margin-left: 0; }
+.viewer-bar .iconbtn:hover { border-color: rgba(255, 255, 255, 0.45); color: #fff; }
+
+/* The point of the overlay is to see the page as large as it will go, so it
+   takes whatever room is left after the bar and never overflows it. */
+#viewer-img {
+  display: block; min-height: 0;
+  max-width: 100%; max-height: calc(100vh - 76px);
+  object-fit: contain;
+  border-radius: 6px; background: #fff;
+}
+.thumb img { cursor: zoom-in; }

@@ -14,7 +14,7 @@ APP_NAME = "Composition Marker"
 APP_AUTHOR = "Darren Ng"
 APP_VERSION = "1.0.0"
 
-GITHUB_REPO = "NGJHD/Composition-Feedback"
+GITHUB_REPO = "NGJHD/Composition-Marker"
 REPO_URL = "https://github.com/%s" % GITHUB_REPO
 
 

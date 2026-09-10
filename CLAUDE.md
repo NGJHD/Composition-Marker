@@ -293,6 +293,12 @@ What went well, What to work on, Sentences to improve (a table of at most six ro
 was written, a stronger version, why), **Notes on the reading**, and an Overall comment
 addressed to the child.
 
+**The length line is inserted by the app, not written by the model.** Directly under the
+criteria table: *"380 words, against the 120-150 words usually expected at Primary 4
+level."* Counting is arithmetic and a model asked to count words will guess — and this is
+often the most useful line in the report, because it is the one judgement the reader can
+check themselves.
+
 Parse the headline score with a forgiving regex and treat it as **not load-bearing**: a
 missing number costs a badge on the result page, never a failed job. The report is the
 document.
@@ -437,6 +443,11 @@ Single page, no framework, no bundler, no CDN. Everything served locally.
 2. **Page strip** — a thumbnail per page, numbered, with drag-to-reorder, arrow buttons
    and a remove button. The arrows are not decoration: dragging is unusable by keyboard
    and fiddly on a laptop trackpad.
+
+   **Double-clicking a thumbnail opens the page full size**, with paging and arrow keys.
+   A 132px thumbnail is enough to see that a page is upside down and not enough to tell
+   page 3 from page 4 — which is exactly the judgement the reordering controls exist to
+   support, so the strip has to be able to answer it.
 3. **Level dropdown** — thirteen levels, JC2 down to Primary 1, defaulting to Primary 5.
 4. **Language dropdown** — English or Chinese.
 5. **Topic** — one optional text field. Without it the model cannot judge relevance to
@@ -491,6 +502,17 @@ so a run that outlasted its median read *"73%"* and *"about 0s left"* at the sam
 The remaining time is `expected × e^(-elapsed/expected)` — the same curve, differentiated
 — which falls as the job runs and never reaches zero while it is still running. Below
 twenty seconds the UI stops giving a number at all and says *finishing up*.
+
+**Say what the model is doing, not just which stage it is in.** The marking call spends a
+minute or more producing reasoning before the first word of the report appears, and with
+only content tokens counted the stage line sat unchanged throughout — which reads as a
+hang, and was reported as one. Count the `reasoning_content` deltas as well as `content`,
+take the prompt size from `/tokenize` before dispatch, and show all three live:
+
+> Marking the composition — 1,650 read · thinking, 2,150 tokens · 36 tokens/s
+
+switching to *writing, N written* once the report starts. The same line goes to the log
+every thirty seconds, so a finished job's log still shows what the long call was doing.
 
 **Never show a raw exception.** Map failures to plain sentences, write the traceback to
 `temp\job.log`, and offer "Copy diagnostic info".

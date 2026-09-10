@@ -69,6 +69,32 @@ comes out as low as it does.
 
 ## 3. Deviations from CLAUDE.md
 
+### 3.0 32768 was tried, and it cost twelve times the transcription speed
+
+Raised to 32768 first, on the reasonable worry that the 157-word test script was
+under-measuring: a real Primary 4 composition is nearer 400 words and a JC2 essay 800.
+Then measured on a real 380-word three-page script, same machine, same model:
+
+| | ctx 16384 | ctx 32768 |
+|---|---|---|
+| Transcribe, per page | **8-9 s** | **70-73 s** |
+| Generation during transcription | 36 tok/s | **2 tok/s** |
+| Generation during marking | 36 tok/s | 24 tok/s |
+| Whole job | ~3 min | ~6.5 min |
+
+On a 10 GB card the extra ~0.53 GB of KV cache is exactly what the image-encode buffers
+needed. Losing it pushes them out of VRAM and the vision path collapses.
+
+And the headroom bought nothing. The 380-word script used **prompt 1,647, reasoning
+1,931, report 1,098 — about 4,700 tokens, 29% of a 16k window.** The projection that
+justified the change assumed reasoning scales with composition length; it does not. The
+same 157-word script produced **2,191 tokens of reasoning on one run and 5,504 on
+another**, so run-to-run variance dwarfs the variance with length, and 16k holds the
+worst of both comfortably.
+
+Put back to 16384, with `max_mark_tokens` at 12,000 — enough for the worst reasoning seen
+plus a long report, still leaving room for the prompt inside the window.
+
 ### 3.1 `ctx_size` is 16384, not the meeting app's 32768 (deliberate)
 
 Nothing here is chunked, so the largest single call is bounded and small:
@@ -570,6 +596,71 @@ twenty seconds the UI stops quoting a number and says *finishing up*; below a mi
 
 The bar itself was not wrong. At `t = T` the curve is at 63% of the stage, which is the
 whole point of an asymptote — it can be late without ever overshooting.
+
+---
+
+### 7.3 IQ3_XXS on the rewrite: no better than IQ2, and 3.6 GB larger
+
+Tried at the operator's request, on the same Primary 2 case. With the report-grounded
+prompt it produces a rewrite that is clearly distinct from the minimal correction, opens
+with "The sky blazed with a flaming red hue", and applies every identified fix. It also
+keeps the title, which IQ2 drops about half the time.
+
+But it does not do what Q4_K_M does: no new sentences of detail, and the ending is left
+as it was. That is the same shortfall as IQ2 with grounding, not a step towards Q4.
+
+| | IQ2_XXS + grounding | IQ3_XXS + grounding | Q4_K_M |
+|---|---|---|---|
+| Differs from the minimal correction | yes | yes | yes |
+| Applies the identified fixes | yes | yes | yes |
+| Rewrites the opening | usually | yes | yes |
+| Adds new detail, rewrites the ending | no | no | **yes** |
+| Keeps the title | ~half the time | yes | yes |
+| Size | 7.3 GB | 10.9 GB | 16.5 GB |
+
+**Recommendation: keep IQ2_XXS as the low-quality option.** The step change is between
+the sub-4-bit quants and Q4_K_M, not between IQ2 and IQ3. IQ3 costs 3.6 GB more, and on a
+10 GB card it no longer fits whole where IQ2 does. If a machine has room for IQ3 it very
+nearly has room for Q4_K_M, which is the one that actually solves this.
+
+### 7.4 "It's just stuck there"
+
+Reported against `[01:42:09] Marking the composition`, which sat unchanged for minutes.
+
+Nothing was stuck. The marking call runs with thinking on, and reasoning arrives in a
+separate `reasoning_content` field that the stream reader was discarding — deliberately,
+because it is not part of the document. But it meant that during the 60-150 seconds the
+model spends reasoning, **nothing was counted and nothing moved.**
+
+Both streams are now counted, the prompt size comes from `/tokenize` before dispatch, and
+the progress line reads:
+
+```
+Marking the composition — 1,650 read · thinking, 2,150 tokens · 36 tokens/s
+```
+
+switching to `writing, N written` when the report starts. `timings_per_token` was tried
+first — this build does not populate intermediate chunks with it, only the final usage
+chunk under `stream_options.include_usage`, which is too late to display.
+
+The same line goes to `temp\job.log` every thirty seconds, which is also how the 32k
+regression in section 3.0 was spotted: 2 tokens/s where there should have been 36.
+
+### 7.5 A duplicated log line, and a stale corrected version
+
+Two small ones, both visible in the screenshots above.
+
+**`llm: starting llama-server on port 8080` appeared twice.** The SSE endpoint registered
+the client's queue and *then* built the backlog inside the async generator, which runs
+later — so anything logged in between was in both. The backlog is now snapshotted at
+registration.
+
+**A re-mark left the previous composition's corrected versions behind.** Two compositions
+with the same topic and level share an output folder; the second run overwrote the
+transcript and the report but not `_corrected.md` and `_improved.md`, leaving a corrected
+version of somebody else's writing under the right name and date. They are deleted when a
+new transcript is written — they are always regenerable, and a mismatched one is not
+worth keeping.
 
 ---
 

@@ -10,7 +10,7 @@
   var state = {
     jobId: null, events: null, timer: null, started: 0,
     pages: [], docs: {}, tab: null, phase: "mark",
-    opts: {}, name: null, dragFrom: null
+    opts: {}, name: null, dragFrom: null, viewing: null
   };
 
   /* ---------------------------------------------------------------- boot */
@@ -307,6 +307,10 @@
   }
 
   function renderPages() {
+    // Removing pages revokes their object URLs, so an open viewer could be
+    // left pointing at one that no longer decodes.
+    if (state.viewing !== null && state.viewing >= state.pages.length) closeViewer();
+
     var host = $("thumbs");
     host.textContent = "";
     show("pages", state.pages.length > 0);
@@ -323,6 +327,11 @@
       var img = document.createElement("img");
       img.src = page.url;
       img.alt = "Page " + (i + 1);
+      img.title = "Double-click to see this page full size";
+      // Double-click, not click: a single click is how you pick a thumbnail
+      // up to drag it, and opening an overlay on every failed drag would be
+      // maddening.
+      img.addEventListener("dblclick", function () { openViewer(i); });
       li.appendChild(img);
 
       var bar = document.createElement("div");
@@ -402,6 +411,39 @@
     $("setup-error").textContent = msg;
     $("setup-error").hidden = false;
   }
+
+  /* ---------------------------------------------------------- page viewer */
+
+  // Paging inside the overlay matters as much as the zoom: telling page 3 from
+  // page 4 means comparing them, and closing and reopening to do that is the
+  // slow way round.
+  function openViewer(index) {
+    if (index < 0 || index >= state.pages.length) return;
+    state.viewing = index;
+    var page = state.pages[index];
+    $("viewer-img").src = page.url;
+    $("viewer-img").alt = "Page " + (index + 1);
+    $("viewer-title").textContent =
+      "Page " + (index + 1) + " of " + state.pages.length;
+    $("viewer-prev").disabled = index === 0;
+    $("viewer-next").disabled = index === state.pages.length - 1;
+    show("viewer", true);
+  }
+
+  function closeViewer() {
+    show("viewer", false);
+    // Release the decoded image rather than leaving a full-size page bitmap
+    // held after the overlay is gone.
+    $("viewer-img").removeAttribute("src");
+    state.viewing = null;
+  }
+
+  $("viewer-close").addEventListener("click", closeViewer);
+  $("viewer-prev").addEventListener("click", function () { openViewer(state.viewing - 1); });
+  $("viewer-next").addEventListener("click", function () { openViewer(state.viewing + 1); });
+  $("viewer").addEventListener("click", function (e) {
+    if (e.target === $("viewer")) closeViewer();
+  });
 
   /* -------------------------------------------------------------- marking */
 
@@ -593,7 +635,16 @@
         Array.prototype.forEach.call(tabs.querySelectorAll(".tab"), function (t) {
           t.hidden = keys.indexOf(t.dataset.target) === -1;
         });
-        if (keys.length) select(keys.indexOf(state.tab) === -1 ? keys[0] : state.tab);
+        // Transcript sits first in the row -- it is what the marking is an
+        // opinion about -- but the marking is what the user came for, so that
+        // is the tab that opens. `state.tab` wins when it is set, which is how
+        // a finished correction lands on the document it just wrote.
+        if (keys.length) {
+          var wanted = keys.indexOf(state.tab) !== -1 ? state.tab
+                     : keys.indexOf("marking") !== -1 ? "marking"
+                     : keys[0];
+          select(wanted);
+        }
         buildNote();
         updateGenerateLabel();
 
@@ -610,10 +661,8 @@
       .then(function (d) {
         $("build-note").textContent = d.minutes
           ? "About " + d.minutes + (d.minutes === 1 ? " minute" : " minutes") +
-            " — the model writes the whole composition again. The photographs " +
-            "are not read again."
-          : "The model writes the whole composition again from what it read. " +
-            "The photographs are not read again.";
+            " — the model generates the corrected version from the transcript."
+          : "The model generates the corrected version from the transcript.";
       })
       .catch(function () { $("build-note").textContent = ""; });
   }
@@ -810,6 +859,14 @@
     return typeof line === "string" && /^\s*\|.*\|\s*$/.test(line);
   }
 
+  // Once a table has started, a line that opens with a pipe belongs to it even
+  // if the closing pipe is missing. The model drops the trailing pipe often
+  // enough that a table was seen rendering its first rows and then spilling
+  // the rest onto the page as raw text.
+  function isBodyRow(line) {
+    return typeof line === "string" && /^\s*\|/.test(line);
+  }
+
   // The ---|---|--- line under the header. Colons for alignment are accepted
   // and ignored: nothing the prompts ask for depends on them.
   function isDivider(line) {
@@ -830,7 +887,13 @@
     var cols = head.length;
     body.forEach(function (row) { if (row.length > cols) cols = row.length; });
 
-    var html = '<div class="tablewrap"><table><thead><tr>';
+    // The criteria table is the one with short numeric columns that must not
+    // wrap -- "26 / 40" broken over two lines is unreadable. Detected by its
+    // heading rather than styled globally, because column two of the sentence
+    // table is a whole sentence and must be free to wrap.
+    var marks = head.length > 2 && /^criterion$/i.test((head[0] || "").trim());
+    var html = '<div class="tablewrap"><table' + (marks ? ' class="marks"' : '') +
+               '><thead><tr>';
     for (var h = 0; h < cols; h++) {
       html += "<th>" + inline(head[h] === undefined ? "" : head[h]) + "</th>";
     }
@@ -862,7 +925,7 @@
         var head = cells(line);
         var body = [];
         i += 2;
-        while (i < lines.length && isRow(lines[i])) { body.push(cells(lines[i])); i++; }
+        while (i < lines.length && isBodyRow(lines[i])) { body.push(cells(lines[i])); i++; }
         i--;
         out.push(table(head, body));
         continue;
@@ -933,6 +996,10 @@
   });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && !$("about").hidden) show("about", false);
+    if ($("viewer").hidden) return;
+    if (e.key === "Escape") closeViewer();
+    if (e.key === "ArrowLeft") openViewer(state.viewing - 1);
+    if (e.key === "ArrowRight") openViewer(state.viewing + 1);
   });
 
   waitForServer(0);

@@ -278,7 +278,7 @@ def mark(job: Job, server: llm.LlamaServer, cfg: dict, composition: str) -> str:
         prompt,
         thinking=bool(thinking.get("mark", True)),
         effort=str(thinking.get("mark_effort", "medium")),
-        max_tokens=int(cfg["llm"].get("max_mark_tokens", 6000)),
+        max_tokens=int(cfg["llm"].get("max_mark_tokens", 12000)),
         temperature=0.7,
         top_p=0.8,
         stage="mark",
@@ -454,6 +454,45 @@ def write_transcript(job: Job, text: str) -> Path:
     return paths["transcript"]
 
 
+_SCORE_TABLE_END = re.compile(
+    r"(^\|\s*Organisation\b.*$)", re.MULTILINE | re.IGNORECASE)
+
+
+def length_note(job: Job, composition: str) -> str:
+    """How long the composition actually is, against what the level expects.
+
+    Counted here rather than asked of the model. Length is arithmetic, and a
+    model asked to count words will guess -- while "380 words" against an
+    expected "120-150" is often the single most useful line in the report,
+    because it is the one judgement a parent can check themselves.
+    """
+    level = levels.BY_KEY.get(job.level)
+    spec = (level or {}).get(job.language) or (level or {}).get("en") or {}
+    expected = spec.get("length", "")
+    actual = _size_of(composition, job.language)
+    if not expected:
+        return "**Length:** %s" % actual
+    return ("**Length:** %s, against the %s usually expected at %s level"
+            % (actual, expected, levels.label(job.level) or "this"))
+
+
+def _insert_length(report: str, note: str) -> str:
+    """Put the length line directly under the criteria table.
+
+    Anchored on the Organisation row, which is the last line of that table in
+    every report the prompt asks for. If it is not found -- a model that
+    renamed the row, say -- the note goes after the Score heading instead, and
+    if that is missing too it is appended. It should always appear somewhere.
+    """
+    m = _SCORE_TABLE_END.search(report)
+    if m:
+        return report[:m.end()] + "\n\n" + note + report[m.end():]
+    heading = re.search(r"^##\s+Score\s*$", report, re.MULTILINE)
+    if heading:
+        return report[:heading.end()] + "\n\n" + note + report[heading.end():]
+    return report.rstrip() + "\n\n" + note + "\n"
+
+
 def write_report(job: Job, report: str) -> Path:
     paths = _paths(job)
     # The model writes its own "# Marking - ..." heading. The metadata block is
@@ -475,6 +514,28 @@ def write_correction(job: Job, kind: str, text: str) -> Path:
         CORRECTION_LABELS[kind], job.name, _header(job), text)
     config.write_atomic(path, body)
     return path
+
+
+def _clear_stale_corrections(job: Job) -> None:
+    """Delete corrected versions belonging to a previous transcript.
+
+    Two compositions with the same topic and level share an output folder, and
+    the second run overwrites the transcript and the report but not the
+    corrections -- which are then a corrected version of somebody else's
+    writing, sitting under the right name with the right date.
+
+    The corrections are always regenerable from the transcript, so deleting
+    them is cheap; leaving a mismatched one is not.
+    """
+    paths = _paths(job)
+    for key in ("minimal", "improved"):
+        try:
+            if paths[key].exists():
+                paths[key].unlink()
+                job.log("removed %s, left over from an earlier marking"
+                        % paths[key].name)
+        except OSError:
+            pass
 
 
 def read_transcript(job: Job) -> str:
@@ -518,10 +579,12 @@ def run(job: Job) -> None:
         job.set_stage("transcribe")
         composition = transcribe_pages(job, server, cfg)
         job.transcript_path = write_transcript(job, composition)
+        _clear_stale_corrections(job)
         job.log("transcript: %s" % _size_of(composition, job.language))
 
         report = mark(job, server, cfg, composition)
         job.score = parse_score(report)
+        report = _insert_length(report, length_note(job, composition))
         job.report_path = write_report(job, report)
         job.log("marked: %s"
                 % ("%d / 100" % job.score if job.score is not None

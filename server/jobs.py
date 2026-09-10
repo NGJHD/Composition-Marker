@@ -79,6 +79,9 @@ class Job:
     # Set once the transcription stage knows how many pages are in flight, so
     # the bar can move within the stage rather than jumping per page.
     page_index: int = 0
+    # Live counts for the model call in flight: prompt tokens, and reasoning
+    # and content tokens as they stream back. Empty between calls.
+    call_stats: dict = field(default_factory=dict)
 
     cancel_event: threading.Event = field(default_factory=threading.Event)
     procs: list = field(default_factory=list)
@@ -231,6 +234,43 @@ class Job:
             self.message = message
         self.emit(self._status())
 
+    # -- what the model call in flight is doing ---------------------------
+
+    def begin_call(self, prompt_tokens: int = 0) -> dict:
+        self.call_stats = {"prompt": int(prompt_tokens), "reasoning": 0,
+                           "content": 0, "started": time.time()}
+        return self.call_stats
+
+    def end_call(self) -> None:
+        self.call_stats = {}
+
+    def call_summary(self) -> str:
+        """One line of what the model is doing right now.
+
+        A marking call spends a minute or more producing reasoning before the
+        first word of the report appears. With nothing counted, the stage line
+        sat unchanged throughout and read as a hang -- so the reasoning tokens
+        are counted and named, and the line switches to the report once that
+        starts arriving.
+        """
+        stats = self.call_stats
+        if not stats:
+            return ""
+        elapsed = max(time.time() - stats["started"], 0.001)
+        done = stats["reasoning"] + stats["content"]
+        bits = []
+        if stats["prompt"]:
+            bits.append("%s read" % format(stats["prompt"], ","))
+        if stats["content"]:
+            bits.append("writing, %s written" % format(stats["content"], ","))
+        elif stats["reasoning"]:
+            bits.append("thinking, %s tokens" % format(stats["reasoning"], ","))
+        else:
+            bits.append("waiting for the first token")
+        if done:
+            bits.append("%.0f tokens/s" % (done / elapsed))
+        return " · ".join(bits)
+
     def tick(self, message: str = "") -> None:
         """Move the bar within a stage from elapsed time alone.
 
@@ -254,6 +294,11 @@ class Job:
         if self.stage == "transcribe" and self.pages:
             counted = self.page_index / float(len(self.pages))
             fraction = max(fraction * 0.5, counted)
+        if not message:
+            summary = self.call_summary()
+            if summary:
+                message = "%s — %s" % (STAGE_LABELS.get(self.stage, self.stage),
+                                       summary)
         self.set_progress(fraction, message)
 
     def _status(self) -> dict:

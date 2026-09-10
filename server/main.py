@@ -364,12 +364,17 @@ async def events(job_id: str):
     queue: asyncio.Queue = asyncio.Queue()
     job._queues.append(queue)
     job._loop = asyncio.get_running_loop()
+    # Snapshot the backlog at the moment the queue is registered, not inside
+    # the generator below -- that runs later, and anything logged in between
+    # would be both in the snapshot and in the queue, so the client showed it
+    # twice. Observed on "llm: starting llama-server on port 8080".
+    backlog = list(job.log_lines[-200:])
 
     async def stream():
         # Replay current state so a reconnecting client is never blank.
         yield _sse({"type": "status",
                     **{k: v for k, v in job._status().items() if k != "type"}})
-        for line in job.log_lines[-200:]:
+        for line in backlog:
             yield _sse({"type": "log", "line": line})
         try:
             while True:

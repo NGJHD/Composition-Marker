@@ -164,6 +164,21 @@
 
 </main>
 
+<!-- A page, full size. A 132px thumbnail is enough to spot that a page is
+     upside down and not enough to tell page 3 from page 4, which is exactly
+     the judgement the reordering controls need. -->
+<div id="viewer" class="overlay" hidden>
+  <div class="viewer-inner">
+    <div class="viewer-bar">
+      <span class="viewer-title" id="viewer-title"></span>
+      <button id="viewer-prev" class="btn small" type="button">&larr; Previous</button>
+      <button id="viewer-next" class="btn small" type="button">Next &rarr;</button>
+      <button id="viewer-close" class="iconbtn" type="button" aria-label="Close">&times;</button>
+    </div>
+    <img id="viewer-img" alt="">
+  </div>
+</div>
+
 <!-- About lives outside <main> so it is reachable in every state the app can
      be in, including mid-job and on the finished page. -->
 <div id="about" class="overlay" hidden>

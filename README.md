@@ -2,7 +2,7 @@
 
 Photograph a child's handwritten composition, choose the level, press **Mark**. You get a
 score out of 100, feedback, a list of sentences worth improving with rewrites, and — on
-demand — a corrected version you can download.
+demand — a corrected version of the whole composition.
 
 Everything runs on your own computer. The photographs, the handwriting and the marking
 never leave the machine, and the application makes no internet connection at all.
@@ -85,9 +85,9 @@ Quality it applies the specific fixes the marking found but does less of its own
 The **minimal correction** is reliable on both.
 
 The handwriting is read by a machine, and it does make mistakes. Check the **Transcript**
-tab against the page before taking a language deduction seriously — it opens first for
-that reason, and the report has a *Notes on the reading* section where the model flags
-words it suspects it misread.
+tab against the page before taking a language deduction seriously — it is the first tab
+for that reason — and the report has a *Notes on the reading* section where the model
+flags words it suspects it misread.
 
 ---
 
@@ -99,6 +99,7 @@ words it suspects it misread.
 `paths.models_dir` can point somewhere else, so a machine that already holds these model
 files for another application does not need a second copy.
 
-`CLAUDE.md` is the specification. `BUILD_NOTES.md` records what was measured, what was
+The source is MIT licensed (`LICENSE`); `THIRD_PARTY_NOTICES.md` covers the components
+the release zip carries. `CLAUDE.md` is the specification. `BUILD_NOTES.md` records what was measured, what was
 verified against the shipped binaries, and where the implementation deviates from the
 specification and why.

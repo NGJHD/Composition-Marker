@@ -348,8 +348,48 @@ class LlamaServer:
             payload["chat_template_kwargs"]["reasoning_effort"] = (
                 effort if effort in VALID_EFFORT else "medium")
 
-        text = self._stream(payload, idle_timeout=180.0, stage=stage)
+        # How much the model is about to read, so the progress line can say so
+        # from the first second rather than only in hindsight. Exact rather
+        # than estimated: a characters-per-token guess drifts badly on a
+        # rubric full of Markdown, and this costs one local round trip.
+        prompt_tokens = self.token_count(content)
+        text = self._stream(payload, idle_timeout=180.0, stage=stage,
+                            prompt_tokens=prompt_tokens)
         return strip_thinking(text)
+
+    def token_count(self, content) -> int:
+        """Prompt size via /tokenize. 0 when it cannot be counted.
+
+        An image cannot go through /tokenize, so a page call counts only its
+        text part -- and the image is the bulk of it. Rather than report a
+        number that is wrong by 2,500, those calls report nothing and the
+        progress line simply omits the "read" figure.
+        """
+        if not isinstance(content, str):
+            return 0
+        try:
+            data = self._post_json("/tokenize", {"content": content}, timeout=60)
+        except Exception:  # noqa: BLE001 - a missing count is not a failure
+            return 0
+        return len(data.get("tokens", []))
+
+    def _post_json(self, path: str, payload: dict, timeout: float) -> dict:
+        body = json.dumps(payload).encode("utf-8")
+        conn = HTTPConnection("127.0.0.1", self.port, timeout=timeout)
+        try:
+            conn.request("POST", path, body=body,
+                         headers={"Content-Type": "application/json",
+                                  "Content-Length": str(len(body))})
+            resp = conn.getresponse()
+            raw = resp.read()
+            if resp.status != 200:
+                raise RuntimeError("HTTP %d from %s" % (resp.status, path))
+            return json.loads(raw)
+        finally:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
 
     # How the retry loop reacts to a call that ran out of budget. Measured on
     # the marking call: `max_tokens` caps *everything the model generates*,
@@ -373,7 +413,8 @@ class LlamaServer:
         )
         return conn
 
-    def _stream(self, payload: dict, idle_timeout: float, stage: str = "") -> str:
+    def _stream(self, payload: dict, idle_timeout: float, stage: str = "",
+                prompt_tokens: int = 0) -> str:
         """POST a streaming completion and assemble the content.
 
         The timeout is per read, not per call: it catches a server that has
@@ -396,6 +437,8 @@ class LlamaServer:
                 finish = ""
                 pending = b""
                 last_tick = 0.0
+                last_log = time.time()
+                stats = self.job.begin_call(prompt_tokens)
                 while True:
                     chunk = resp.read(4096)
                     if not chunk:
@@ -403,9 +446,12 @@ class LlamaServer:
                     pending += chunk
                     while b"\n" in pending:
                         line, pending = pending.split(b"\n", 1)
-                        piece, reason = self._sse_event(line)
+                        piece, thinking, reason = self._sse_event(line)
                         if piece:
                             parts.append(piece)
+                            stats["content"] += 1
+                        if thinking:
+                            stats["reasoning"] += 1
                         if reason:
                             finish = reason
                     now = time.time()
@@ -413,7 +459,16 @@ class LlamaServer:
                         last_tick = now
                         self.job.check_cancelled()
                         self.job.tick()
+                    # A line in the log every half minute as well as the live
+                    # counter, so a finished job's log still shows what the
+                    # long call was doing while it ran.
+                    if now - last_log > 30.0:
+                        last_log = now
+                        self.job.log("llm: %s" % self.job.call_summary())
                 text = "".join(parts).strip()
+                self.job.log("llm: %s done, %s"
+                             % (stage or "call", self.job.call_summary()))
+                self.job.end_call()
                 if text and finish != "length":
                     return text
                 if text:
@@ -464,31 +519,38 @@ class LlamaServer:
 
     @staticmethod
     def _sse_event(line: bytes) -> tuple:
-        """One `data:` line of an OpenAI-style stream: (content, finish_reason).
+        """One `data:` line of an OpenAI-style stream.
 
-        Only `content` is collected. With --jinja the model's reasoning arrives
-        in a separate `reasoning_content` field, which is deliberately dropped:
-        it is working-out, not the document, and on the marking call it can be
-        longer than the answer.
+        Returns (content, reasoning, finish_reason).
+
+        Only `content` is kept for the document. With --jinja the model's
+        reasoning arrives in a separate `reasoning_content` field and is not
+        part of the answer -- but it is *counted*, because on the marking call
+        the model can spend a minute and a half there before the first word of
+        the report appears. Counting only content made the progress line sit
+        unchanged through all of it, which is what "it's just stuck there"
+        looks like from the outside.
 
         `finish_reason` matters as much as the text. "length" means the answer
         was cut off at `max_tokens` -- which, with thinking on, can mean there
         was no answer at all.
         """
         if not line.startswith(b"data:"):
-            return "", ""
+            return "", "", ""
         raw = line[5:].strip()
         if not raw or raw == b"[DONE]":
-            return "", ""
+            return "", "", ""
         try:
             event = json.loads(raw.decode("utf-8", "replace"))
         except json.JSONDecodeError:
-            return "", ""
-        piece, reason = "", ""
+            return "", "", ""
+        piece, thinking, reason = "", "", ""
         for choice in event.get("choices", []):
             delta = choice.get("delta") or {}
             if delta.get("content"):
                 piece = delta["content"]
+            if delta.get("reasoning_content"):
+                thinking = delta["reasoning_content"]
             if choice.get("finish_reason"):
                 reason = choice["finish_reason"]
-        return piece, reason
+        return piece, thinking, reason

@@ -41,8 +41,7 @@ Q4_MIN_VRAM_MB = 15000
 #   compute buffers, image encode scratch            ~0.6  GB
 #
 # The meeting app allowed 1.5 GB against a 32k context and no projector; the
-# context is half the size here and the projector is new, so the allowance goes
-# up rather than down.
+# context is half the size here and the projector is new, so it nets out higher.
 #
 # Deliberately not generous. llama.cpp loads weights through mmap, so a model
 # that does not quite fit is paged rather than refused. Allocation therefore

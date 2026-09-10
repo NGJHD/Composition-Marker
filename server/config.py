@@ -152,11 +152,23 @@ def write_atomic(path: Path, text: str) -> None:
 _DEFAULTS = {
     "llm": {
         "model": "auto",
-        # 16384, not the meeting app's 32768. Nothing here is chunked: the
-        # largest single call is one page image (~2,450 tokens at 1600px) plus
-        # its prompt, or the whole composition with the rubric and the model's
-        # thinking (~8k). Halving the context returns ~0.5 GB of KV cache,
-        # which is roughly what the vision projector then takes.
+        # 16384, and this was tested at 32768 before being put back.
+        #
+        # The worry was that a real composition -- 380 words for Primary 4, 800
+        # for JC2, not the 157-word test script -- would outgrow the window.
+        # Measured on a real 380-word three-page script: prompt 1,647,
+        # reasoning 1,931, report 1,098. About 4,700 tokens, or 29% of 16k.
+        #
+        # The reasoning does NOT scale with the composition the way it looked
+        # like it would: the same 157-word script produced 2,191 tokens of
+        # reasoning on one run and 5,504 on another, so the variation between
+        # runs dwarfs the variation with length. 16k holds the worst of both.
+        #
+        # And 32768 has a real cost, measured on a 10 GB card: the extra
+        # ~0.53 GB of KV cache pushes the image-encode buffers out of VRAM, and
+        # transcription fell from 6-7 seconds a page to **73 seconds a page**,
+        # with marking down from 36 to 24 tokens/s. A twelve-fold regression on
+        # the vision path to buy headroom nothing was using.
         "ctx_size": 16384,
         "gpu_layers": "auto",
         "cpu_ffn_regex": "auto",
@@ -171,9 +183,20 @@ _DEFAULTS = {
         "startup_timeout_s": 240,
         "max_transcribe_tokens": 2000,
         # These caps cover EVERYTHING the model generates, reasoning included.
-        # Marking runs with thinking on, and at 3000 the model spent the whole
-        # budget reasoning and returned an empty answer -- see BUILD_NOTES.md.
-        "max_mark_tokens": 6000,
+        # Marking runs with thinking on, and the reasoning is both large and
+        # highly variable: 2,191 and 5,504 tokens on two runs of the *same*
+        # two-page script. At 3,000 the model spent the entire budget reasoning
+        # and returned an empty answer; at 6,000 the 5,504-token run was cut
+        # off mid-report and had to be redone with thinking off, which marks
+        # less well.
+        #
+        # 12,000 covers the worst reasoning seen plus a long report, and still
+        # leaves room for the prompt inside a 16k window: the largest prompt
+        # measured is 1,647 for a three-page script, and a JC2 essay should not
+        # exceed ~2,500. A cap is not a target -- a real call finishes in 3,000
+        # -- so the headroom costs nothing except when it is the difference
+        # between a whole report and half a table.
+        "max_mark_tokens": 12000,
         "max_correct_tokens": 4000,
     },
     "thinking": {
