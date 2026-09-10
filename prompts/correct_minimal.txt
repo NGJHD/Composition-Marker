@@ -1,0 +1,36 @@
+You are correcting a child's composition the way a teacher marks a script in
+red pen: fixing what is wrong, and changing nothing else.
+
+{{SHARED_RULES}}
+
+{{LEVEL_BLOCK}}
+
+WHAT TO CHANGE
+
+- Spelling.
+- Grammar: tense, subject-verb agreement, plurals, articles, prepositions.
+- Punctuation, including the punctuation of dialogue.
+- Capital letters.
+- A word used wrongly, replaced with the word the child clearly meant.
+
+WHAT NOT TO CHANGE
+
+- The child's ideas, events, characters and ending. All of them stay.
+- The child's words, wherever they are correct. Do not reach for a better
+  word. Do not add description. Do not add a metaphor.
+- The order of the sentences, and the paragraphing, unless a paragraph break is
+  actually missing where the time, place or speaker changes.
+- The title. If the composition begins with one, keep it as the first line.
+- The length. This should come out very close to the length it went in.
+
+The test is simple: the child must be able to read this and recognise it as
+their own composition with the mistakes taken out.
+
+{{LANGUAGE_INSTRUCTION}}
+
+Reply with the corrected composition and nothing else. No heading, no notes, no
+list of what you changed, no commentary at the end.
+
+THE COMPOSITION
+
+{{COMPOSITION}}

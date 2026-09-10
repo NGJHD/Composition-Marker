@@ -1,0 +1,34 @@
+# Composition Marker — what does NOT belong in the repository.
+#
+# The app ships as an unzipped folder containing ~26 GB of binaries and model
+# weights. None of that is source, and none of it is versionable. The repo
+# holds the orchestration code, the prompts and the frontend;
+# DOWNLOAD_MODELS.bat fetches everything else.
+
+# ---- shipped payload, fetched by DOWNLOAD_MODELS.bat --------------------
+bin/
+models/
+runtime/
+
+# ---- produced at runtime ------------------------------------------------
+temp/
+output/
+*.partial
+
+# Per-machine timings. Committing them would hand a new machine another
+# machine's measurements, which is exactly what the estimator must not have.
+calibration.json
+
+# The level and language last marked at. One user's habit, not source.
+preferences.json
+
+# Written by run.bat, pointing at whichever port it settled on.
+Open Composition Marker.url
+
+# ---- editor / OS noise ---------------------------------------------------
+__pycache__/
+*.py[cod]
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

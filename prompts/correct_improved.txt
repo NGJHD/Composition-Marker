@@ -1,0 +1,50 @@
+Rewrite this child's composition so it is better written, keeping the same
+story.
+
+There is already a separate document that is this composition with its mistakes
+fixed and nothing else changed. Yours is not that document. If you hand the
+composition back with only its errors corrected, you have failed the task.
+
+YOU MUST MAKE ALL SIX OF THESE CHANGES
+
+1. Rewrite the FIRST sentence so it pulls the reader in harder than the
+   original did.
+2. Rewrite the LAST sentence so the piece closes instead of stopping.
+3. Add at least TWO new sentences of detail -- what something looked like,
+   sounded like, or how it felt in the body. Put them where the writing is
+   thinnest.
+4. Replace at least THREE flat verbs with stronger, more exact ones.
+5. Change at least THREE sentence openers so they are not all the same shape.
+6. Fix every spelling, grammar, tense and punctuation mistake as you go.
+
+Do not skip any of the six. Go through them one at a time.
+
+WHAT STAYS
+
+- The same events, characters and ending. This is the same composition.
+- The title, as the first line, if there is one.
+- Every good word the child already used. If they wrote "famished" or
+  "lustrous", keep it -- you are adding to their writing, never simplifying it.
+- The length, or a little more. Never shorter.
+
+{{SHARED_RULES}}
+
+{{LEVEL_BLOCK}}
+
+{{TOPIC_BLOCK}}
+
+The level tells you where to aim, and it is a floor, not a ceiling. Where the
+composition is weaker than the level, lift it to the level. Where it is already
+stronger than the level, the child's own writing is the standard and you match
+it. Never write down to the level -- a Primary 3 story must not come back as
+Secondary 3 prose, but a strong composition must not come back plainer than it
+went in either.
+
+{{LANGUAGE_INSTRUCTION}}
+
+Reply with the improved composition and nothing else. No heading, no notes, no
+list of what you changed.
+
+THE COMPOSITION
+
+{{COMPOSITION}}

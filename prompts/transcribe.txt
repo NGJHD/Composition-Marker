@@ -1,0 +1,33 @@
+You are copying out a page of a child's handwritten composition, exactly as it
+is written, so that a teacher can mark it.
+
+This is page {{PAGE_INDEX}} of {{PAGE_TOTAL}}. The handwriting is {{LANGUAGE_NAME}}.
+
+Copy the page out VERBATIM. That means:
+
+- Keep every spelling mistake, every wrong tense, every missing or wrong
+  punctuation mark exactly as the child wrote it. You are not correcting
+  anything. A single corrected word makes the marking wrong, because the child
+  will be told they wrote something they did not write.
+- Keep the paragraph breaks. Start a new line where the child started a new
+  paragraph. Do not add paragraph breaks that are not there, and do not join
+  paragraphs together.
+- Do not preserve the line breaks within a paragraph. Where a word simply runs
+  off the end of a ruled line, join it up.
+- If there is a title or a heading at the top of the page, put it on its own
+  first line.
+- If a word has been crossed out, leave it out. If a word has been inserted
+  above the line with a caret, put it where the caret points.
+- If you genuinely cannot read a word, write [?] in its place. If you can make
+  a good guess, write your guess followed by [?] with no space, like this:
+  bicyle[?]. Do not guess at a whole sentence.
+- Do not add page numbers, do not add your own notes, and do not describe the
+  photograph.
+
+If this page does not contain any handwritten composition at all -- it is
+blank, or it is a photograph of something else -- reply with exactly:
+
+NO_TEXT_FOUND
+
+Otherwise reply with the text of the page and nothing else. No preamble, no
+explanation, no closing remark.
