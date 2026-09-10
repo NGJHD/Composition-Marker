@@ -351,8 +351,12 @@ def correct(job: Job, server: llm.LlamaServer, cfg: dict, composition: str,
         llm.load_prompt("correct_%s" % kind),
         level_block=levels.expectations_block(job.level, job.language),
         topic_block=_topic_block(job),
-        improvements=(improvements_from_report(job) if kind == "improved"
-                      else ""),
+        # Both corrections get the marking's findings. The improved rewrite
+        # applies all of them; the minimal correction is told in its own prompt
+        # to take only the errors and ignore the stylistic suggestions. Without
+        # it, IQ2_XXS was observed correcting the first paragraph of a 380-word
+        # script and then copying the rest out unchanged.
+        improvements=improvements_from_report(job),
         language_instruction=CORRECT_LANGUAGE_INSTRUCTION.get(
             job.language, CORRECT_LANGUAGE_INSTRUCTION["en"]),
         composition=composition,
@@ -433,12 +437,23 @@ def write_record(job: Job) -> None:
         pass          # a sidecar is a convenience; the documents are the record
 
 
-def _header(job: Job) -> str:
+def _header(job: Job, length_label: str = "") -> str:
     bits = ["**Level:** Singapore %s (age %d)"
             % (levels.label(job.level), levels.age(job.level))]
     if (job.topic or "").strip():
         bits.append("**Topic:** %s" % job.topic.strip())
     bits.append("**Language:** %s" % LANGUAGE_NAMES.get(job.language, "English"))
+    # Counted by the app, not asked of the model: counting is arithmetic, and a
+    # model asked to count words will guess. It sits in the header rather than
+    # under the criteria table because it is a fact about the composition, like
+    # the level and the language, not part of the judgement.
+    # Each document reports its OWN length. On the improved rewrite that is the
+    # rewrite's count, not the original's: the prompt requires it to come back
+    # no shorter than the composition it improves, and quoting the original's
+    # figure on it would hide exactly the thing worth checking.
+    label = length_label or job.length_label
+    if label:
+        bits.append("**Word Count:** %s" % label)
     bits.append("**Marked:** %s" % time.strftime("%d %b %Y, %H:%M"))
     return "\n\n".join(bits)
 
@@ -454,43 +469,10 @@ def write_transcript(job: Job, text: str) -> Path:
     return paths["transcript"]
 
 
-_SCORE_TABLE_END = re.compile(
-    r"(^\|\s*Organisation\b.*$)", re.MULTILINE | re.IGNORECASE)
-
-
-def length_note(job: Job, composition: str) -> str:
-    """How long the composition actually is, against what the level expects.
-
-    Counted here rather than asked of the model. Length is arithmetic, and a
-    model asked to count words will guess -- while "380 words" against an
-    expected "120-150" is often the single most useful line in the report,
-    because it is the one judgement a parent can check themselves.
-    """
-    level = levels.BY_KEY.get(job.level)
-    spec = (level or {}).get(job.language) or (level or {}).get("en") or {}
-    expected = spec.get("length", "")
-    actual = _size_of(composition, job.language)
-    if not expected:
-        return "**Length:** %s" % actual
-    return ("**Length:** %s, against the %s usually expected at %s level"
-            % (actual, expected, levels.label(job.level) or "this"))
-
-
-def _insert_length(report: str, note: str) -> str:
-    """Put the length line directly under the criteria table.
-
-    Anchored on the Organisation row, which is the last line of that table in
-    every report the prompt asks for. If it is not found -- a model that
-    renamed the row, say -- the note goes after the Score heading instead, and
-    if that is missing too it is appended. It should always appear somewhere.
-    """
-    m = _SCORE_TABLE_END.search(report)
-    if m:
-        return report[:m.end()] + "\n\n" + note + report[m.end():]
-    heading = re.search(r"^##\s+Score\s*$", report, re.MULTILINE)
-    if heading:
-        return report[:heading.end()] + "\n\n" + note + report[heading.end():]
-    return report.rstrip() + "\n\n" + note + "\n"
+# The length is a plain fact stated in the header block (see _header), not a
+# judgement inserted into the report. The model still weighs length against the
+# level in its Content and Language comments -- the expected range is in the
+# prompt -- so nothing is lost by keeping the header line bare.
 
 
 def write_report(job: Job, report: str) -> Path:
@@ -511,7 +493,8 @@ def write_correction(job: Job, kind: str, text: str) -> Path:
     paths = _paths(job)
     path = paths["minimal" if kind == "minimal" else "improved"]
     body = "# %s - %s\n\n%s\n\n---\n\n%s\n" % (
-        CORRECTION_LABELS[kind], job.name, _header(job), text)
+        CORRECTION_LABELS[kind], job.name,
+        _header(job, _size_of(text, job.language)), text)
     config.write_atomic(path, body)
     return path
 
@@ -578,13 +561,15 @@ def run(job: Job) -> None:
 
         job.set_stage("transcribe")
         composition = transcribe_pages(job, server, cfg)
+        # Set before the first document is written: every one of them carries
+        # the header block, and the transcript is written first.
+        job.length_label = _size_of(composition, job.language)
         job.transcript_path = write_transcript(job, composition)
         _clear_stale_corrections(job)
         job.log("transcript: %s" % _size_of(composition, job.language))
 
         report = mark(job, server, cfg, composition)
         job.score = parse_score(report)
-        report = _insert_length(report, length_note(job, composition))
         job.report_path = write_report(job, report)
         job.log("marked: %s"
                 % ("%d / 100" % job.score if job.score is not None
@@ -600,6 +585,10 @@ def run_correction(job: Job) -> None:
     cfg = config.load_config()
     job.set_stage("prepare")
     composition = read_transcript(job)
+    # A correction started from the history list has a job rebuilt from disk,
+    # so the count has to come from the transcript rather than from the marking
+    # run that is long over.
+    job.length_label = _size_of(composition, job.language)
     kinds = (["minimal", "improved"] if job.correction == "both"
              else [job.correction])
 

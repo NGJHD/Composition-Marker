@@ -599,6 +599,31 @@ whole point of an asymptote — it can be late without ever overshooting.
 
 ---
 
+### 7.2a The minimal correction quietly stopped correcting on a long script
+
+Found while verifying the word-count change, on the 380-word three-page script. The
+minimal correction fixed `becuase` in the first paragraph and then copied the rest of the
+composition out unchanged — `shinning`, `suddently`, `a old`, `I pick it up`,
+`there was many`, `walk over`, `ask me`, `a letter arrive` all survived.
+
+Worse than useless: the child is told their later paragraphs were fine when they were
+not, and it is the *reliable* one of the two corrections.
+
+A long copy-with-small-edits task is exactly where a 2-bit model drifts into copying. The
+fix is the one that already worked for the improved rewrite: give it the marking report's
+findings. `improvements_from_report` is now passed to **both** prompts — the improved one
+applies everything, and `correct_minimal.txt` is told to take only the errors from it and
+ignore the stylistic suggestions, under a heading that says to work to the very end and
+names copying-the-rest as the way to get it wrong.
+
+After the change every planted error is fixed through all three pages, the title is kept,
+and the two documents still differ.
+
+Not fixed, and worth knowing: the improved rewrite wrote "the sun shined brightly" where
+the minimal correction wrote "shining". IQ2_XXS will occasionally introduce an error while
+improving a sentence. Another reason the minimal correction is the one to trust on that
+model.
+
 ### 7.3 IQ3_XXS on the rewrite: no better than IQ2, and 3.6 GB larger
 
 Tried at the operator's request, on the same Primary 2 case. With the report-grounded

@@ -26,6 +26,19 @@ WHAT NOT TO CHANGE
 The test is simple: the child must be able to read this and recognise it as
 their own composition with the mistakes taken out.
 
+FIX EVERY MISTAKE, NOT THE FIRST FEW
+
+Work through the composition to the very end. On a long piece it is tempting to
+correct the opening carefully and then copy the rest out as it stands -- that is
+the one way to get this badly wrong, because the child is then told their later
+paragraphs were fine when they were not.
+
+{{IMPROVEMENTS}}
+
+The list above was written when the composition was marked. Fix every error it
+names, and every other error you find. But it also suggests better ways of
+saying things: ignore all of that here. Correcting is your only job.
+
 {{LANGUAGE_INSTRUCTION}}
 
 Reply with the corrected composition and nothing else. No heading, no notes, no

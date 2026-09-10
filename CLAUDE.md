@@ -293,11 +293,23 @@ What went well, What to work on, Sentences to improve (a table of at most six ro
 was written, a stronger version, why), **Notes on the reading**, and an Overall comment
 addressed to the child.
 
-**The length line is inserted by the app, not written by the model.** Directly under the
-criteria table: *"380 words, against the 120-150 words usually expected at Primary 4
-level."* Counting is arithmetic and a model asked to count words will guess — and this is
-often the most useful line in the report, because it is the one judgement the reader can
-check themselves.
+**The word count is counted by the app, never asked of the model.** Counting is
+arithmetic, and a model asked to count words will guess. It goes in the header block of
+every document, between Language and Marked, as a bare fact:
+
+```
+**Language:** English
+**Word Count:** 380 words
+**Marked:** 11 Sep 2026, 02:16
+```
+
+Bare on purpose — no comparison against the expected range. It belongs with the level and
+the language, which are facts about the composition, not with the judgement. The model
+still weighs length against the level in its Content and Language comments, because the
+expected range is in the prompt.
+
+Chinese reports characters rather than words, since that is what 字数 means and what the
+level expectations are written in.
 
 Parse the headline score with a forgiving regex and treat it as **not load-bearing**: a
 missing number costs a badge on the result page, never a failed job. The report is the

@@ -59,6 +59,9 @@ class Job:
     correction: str = "both"                      # minimal | improved | both
 
     name: str = ""                                # the output folder's name
+    # "380 words", or "205 characters" for Chinese. Counted once the transcript
+    # exists and shown in every document's header block.
+    length_label: str = ""
     report_path: Optional[Path] = None
     transcript_path: Optional[Path] = None
     corrected_paths: list = field(default_factory=list)
