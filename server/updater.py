@@ -163,6 +163,19 @@ def pick_asset(release: dict):
     return version.pick_asset(release.get("assets") or [])
 
 
+def is_our_asset_url(url: str) -> bool:
+    """Only a release asset from this application's own repository.
+
+    The URL reaches the install endpoint from the page, which means it is not
+    to be trusted to point wherever it likes -- the same reason UPDATE_BUTTON.md
+    re-checks the prefix in the main process rather than believing the
+    renderer. A general-purpose "download and run this" bridge is a hole worth
+    not opening, and this one ends in code being copied over the application.
+    """
+    prefix = "https://github.com/%s/releases/download/" % version.GITHUB_REPO
+    return url.startswith(prefix) and ".." not in url
+
+
 def check() -> dict:
     """What the Check button reports. Never raises for "no update"."""
     sweep()

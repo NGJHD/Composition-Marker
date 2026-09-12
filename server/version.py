@@ -1,4 +1,4 @@
-"""App identity and version arithmetic.
+﻿"""App identity and version arithmetic.
 
 The only file that changes when this code is reused for a different app, and
 the only place the version number lives. Everything here is pure -- no network,
@@ -12,7 +12,7 @@ import re
 
 APP_NAME = "Composition Marker"
 APP_AUTHOR = "Darren Ng"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
 
 GITHUB_REPO = "NGJHD/Composition-Marker"
 REPO_URL = "https://github.com/%s" % GITHUB_REPO
