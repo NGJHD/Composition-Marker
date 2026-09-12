@@ -72,20 +72,40 @@ app = FastAPI(title=version.APP_NAME, docs_url=None, redoc_url=None,
 # static frontend
 # ---------------------------------------------------------------------------
 
+# Revalidate the frontend on every load.
+#
+# Served with only an etag and last-modified -- which is what FileResponse does
+# by itself -- a browser is free to apply *heuristic* caching: with no
+# Cache-Control to tell it otherwise it reuses the copy it has, without asking,
+# for roughly a tenth of the file's age. So an updated app folder kept serving
+# the previous version's stylesheet and script, and the symptom was baffling --
+# the new HTML and the new API, driving last week's JavaScript.
+#
+# "no-cache" does not mean "do not store": it means "ask me first". The etag
+# still answers 304 on an unchanged file, so this costs one conditional request
+# per asset per load, over loopback, and makes copying a new folder in behave
+# the way anyone would expect.
+NO_CACHE = {"Cache-Control": "no-cache, must-revalidate"}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
-    return HTMLResponse((config.WEB / "index.html").read_text(encoding="utf-8"))
+    return HTMLResponse((config.WEB / "index.html").read_text(encoding="utf-8"),
+                        headers=NO_CACHE)
 
 
 @app.get("/app.js")
 async def app_js() -> FileResponse:
     return FileResponse(config.WEB / "app.js",
-                        media_type="application/javascript; charset=utf-8")
+                        media_type="application/javascript; charset=utf-8",
+                        headers=NO_CACHE)
 
 
 @app.get("/style.css")
 async def style_css() -> FileResponse:
-    return FileResponse(config.WEB / "style.css", media_type="text/css; charset=utf-8")
+    return FileResponse(config.WEB / "style.css",
+                        media_type="text/css; charset=utf-8",
+                        headers=NO_CACHE)
 
 
 @app.get("/api/health")
