@@ -9,12 +9,13 @@
     "threads": "auto",
     "mmproj": "mmproj-F16.gguf",
     "mmproj_offload": "auto",
+    "mtp": "auto",
     "port": 8719,
     "startup_timeout_s": 240,
     "max_transcribe_tokens": 2000,
     "max_mark_tokens": 12000,
     "max_correct_tokens": 4000,
-    "max_improved_tokens": 8000
+    "max_improved_tokens": 12000
   },
   "thinking": {
     "transcribe": false,

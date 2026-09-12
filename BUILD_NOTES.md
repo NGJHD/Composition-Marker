@@ -689,15 +689,325 @@ worth keeping.
 
 ---
 
+### 7.6 IQ4_XS on a 16 GB card: the quant this app should have had
+
+Tried at the operator's request on an **RTX 5060 Ti 16 GB**, which is the first 16 GB card
+this has run on and closes the "a 16 GB card" item in section 9. Model:
+`Qwen3.8-27B-i1-IQ4_XS-GGUF-Smaller.gguf`, 13.54 GB.
+
+It was run through the app's own pipeline and prompts with the **Port** option, against a
+hand-started `llama-server` on 9931 carrying the same flags the app builds. Nothing in the
+model table was touched. All three runs mark the **same two photographs of real
+handwriting** — a P4 narrative on ruled school paper, blue ink, with crossings-out and a
+caret insertion — so the comparison is like for like. It is also the first section here
+measured on real handwriting rather than a rendered font.
+
+### 7.6a Why it is faster, which is arithmetic rather than luck
+
+`OVERHEAD_GB = 2.0` against a 16311 MiB card leaves 15.93 GB available, so:
+
+| Model | File | Needed | `offload_regex` on this card |
+|---|---|---|---|
+| Q4_K_M | 16.46 GB | 18.46 | `blk\.(49|...|63)\.ffn_.*=CPU` — **15 FFN blocks to system RAM** |
+| IQ4_XS | 13.54 GB | 15.54 | **none — fully on the GPU** |
+| IQ2_XXS | 7.27 GB | 9.27 | none |
+
+A 16 GB card is exactly the size at which Q4_K_M *almost* fits, and "almost" costs a
+quarter of the FFN stack. The threshold this is measured against — now `HQ_MIN_VRAM_MB`,
+still 15000 — was not wrong: Q4_K_M does run there, and it marks well. It simply runs at a
+third of the speed of a quant that fits whole. Swapping which file "High Quality" names is
+therefore the whole fix, and the threshold needs no change: IQ4_XS wants
+13.54 + 2.0 = 15.54 GB to sit entirely on the card, so a machine reporting between 15.0
+and 15.5 GB takes a small offload instead of none, which is the right answer for it.
+
+### 7.6b Measured, same two pages, same card
+
+| | IQ2_XXS | Q4_K_M | **IQ4_XS** |
+|---|---|---|---|
+| Fits whole in 16 GB | yes | **no** | **yes** |
+| Transcribe, s/page | 10-19 | **100-130** | **14, 15** |
+| Transcribe tok/s | ~19 | 8.5 | 17-19 |
+| Marking call | 93-581 s | **948 s** | **322 s** |
+| Marking tok/s | - | 8.5 | 25.5 |
+| Minimal correction | - | 75-157 s | **23 s** |
+| Peak VRAM with the projector | - | - | **15.1 GB of 16.3** |
+| Load from warm cache | 5.6 s | 8.6 s | 7 s |
+
+Peak VRAM leaves about 1.2 GB spare, so **`OVERHEAD_GB` does not need raising** for this
+quant on this card. It is tight enough that it should not be lowered either.
+
+### 7.6c Transcription: content-identical to Q4_K_M
+
+Diffed word by word against Q4_K_M's transcript of the same photographs. **Three
+differences in 400 words**, and the same two paragraph breaks in the same places:
+
+| Q4_K_M | IQ4_XS | |
+|---|---|---|
+| a present-tense verb, as written | corrected to past tense | wrong: silently fixed the child's tense error |
+| a possessive with no apostrophe, as written | apostrophe supplied | wrong: silently corrected the child's punctuation |
+| a comma before a caret-inserted adverb | no comma | right: the page has no comma there |
+
+Both regressions are the *damaging* direction described in section 6: the error never
+reached the marking, so the child was never told about it. Q4_K_M's report flags both of
+them (its rows 12 and 13); IQ4_XS's cannot, and does not.
+
+Against the photographs, **both** read correctly: a subject-verb disagreement, an
+accidentally doubled word, a stray comma inside a subordinate clause, a wrong modal tense,
+one crossed-out word correctly dropped, and one caret-inserted adverb correctly honoured.
+Both silently corrected two of the child's misspellings — one a common letter-swap, one a
+misspelt dialogue verb — which is section 6's `becuase` finding reproducing on real
+handwriting, at every quantisation. Both also retained a *different* crossed-out word,
+which the prompt says to omit.
+
+**Both paragraphed the transcript correctly**, which section 8a says does not happen. It
+is not a contradiction so much as a limit on 8a's claim: this child's indents are wide and
+the ink is clean, and on that page the model preserved them unasked. On the pencil page
+under red annotation it still does not. Unpredictable, as 8a says, so nothing changes.
+
+### 7.6d IQ2_XXS on the same page, for contrast
+
+Nine content differences against Q4_K_M's reading, every one of them IQ2's error:
+
+a mid-sentence comma turned into a full stop, inventing a fragment - a misspelt dialogue
+verb replaced with a different word entirely - one adverb swapped for a near-homonym - a
+crossed-out word kept - an exclamation mark inside dialogue turned into a full stop - a
+possessive silently given its apostrophe - **the caret-inserted adverb dropped entirely** -
+a lower-case conjunction capitalised, moving the sentence boundary - and **both paragraph
+breaks lost**, returning one unbroken block.
+
+The first of those is the worst thing in this file. IQ2 turned the child's opening comma
+into a full stop, and row 1 of its own report then quoted the resulting half-sentence back
+and told the child it was a fragment — **correcting the child for the machine's error.**
+That is the failure section 7.3a exists to prevent, arriving by a route 7.3a does not
+cover: not a judgement about layout, but an invented error inside the text itself.
+
+### 7.6e Marking quality
+
+IQ4_XS scored 84/100 where both others scored 78, and the report is the equal of
+Q4_K_M's: bands consistent with the marks (35/40 to band 4, 32/40 to 4, 17/20 to 4), every
+row of *Sentences to improve* carrying a real change, and it independently caught the same
+unnatural figure of speech in the closing paragraph that Q4_K_M did.
+
+It also did something neither other run managed: *Notes on the reading* **flagged the
+accidentally doubled word as a probable duplication and told the reader to check the
+page.** That is exactly the mitigation that section is for, and on this page it was right.
+Q4_K_M said "Nothing to report."
+
+Two small regressions against Q4_K_M: 14 rows against 17, and the rows are numbered
+`1-6, 8, 10-13, 15, 16, 18, 19` — the model numbered against every sentence in the
+composition and emitted only the ones it changed, so the table reads as though rows went
+missing. Cosmetic, and internally consistent with the *What to work on* cross-references.
+
+IQ2_XXS's report, by contrast, carries three defects the other two do not: **two rows
+where "What was written" and "A stronger version" are identical** (#16 and #18, with
+reasons like "The original is fine"), which the prompt forbids; **Language 33/40 labelled
+band 3 while Content 32/40 is band 4**, a higher mark in a lower band; and **wrong
+grammatical advice** — it told the child they slip between tenses, citing `I groaned`
+against `I'm late`, which is inside direct speech and correct.
+
+### 7.6f The corrected versions
+
+Both minimal corrections do the job. Q4_K_M's is the bolder of the two: alongside the
+comma splices and the subject-verb agreement it also swaps one verb for a more precise
+one, replaces an unnatural figure of speech with the natural image, and supplies a missing
+speaker attribution in a line of dialogue.
+
+**Those are minimal corrections and were ruled so by the operator**, on the standard that
+matters: they repair the sentence without changing what the child meant. The figure of
+speech is a wrong-word error of exactly the kind section 8 names — "a wrong word replaced
+with the one clearly meant" — not a stylistic rewrite, and a missing speaker attribution is
+a punctuation repair. The distinction section 8 is drawing is not "few changes" but "the
+child's meaning, intact"; a rewrite is what risks replacing a paragraph outright or
+inventing plot, and neither correction does that.
+
+IQ4_XS's is more conservative: it keeps all three of those as the child wrote them, and
+fixes the comma splices, the agreement error, a pronoun that disagreed with its plural
+noun, the doubled word and the speech punctuation. It also leaves one comma splice
+standing — the same missing speaker attribution — which Q4_K_M repaired. On this script
+that is the one place Q4_K_M's correction is the better document.
+
+So: no change needed to `correct_minimal.txt`, and no quality gap between the two quants
+here worth acting on. Recorded because an earlier draft of this section had it the other
+way round and called Q4_K_M's version a spec failure; it is not one.
+
+The improved rewrite is a genuine reimagining: **zero paragraphs shared with the corrected
+version**, new sensory detail and a new closing reflection that appear nowhere in the
+original, properly paragraphed, and pitched at about P5. It came back at 426 words against
+the 420-word ceiling — 1.5% over, not worth a guard.
+
+### 7.6g The improved rewrite's token budget was simply too small
+
+On **both** Q4_K_M and IQ4_XS the `correct-improved` call spent its entire 8,000-token
+budget on reasoning and returned no answer, then succeeded on the automatic thinking-off
+retry. Same failure, same place, at 8.5 and 25 tok/s alike, so it was never the weights.
+
+Four runs of the app's own `correct_improved` prompt against the same script settle what
+it was:
+
+| thinking | budget | finish | completion | answer |
+|---|---|---|---|---|
+| `medium` | 8,000 | `length` | 8,000 | **none** |
+| `low` | 8,000 | `length` | 8,000 | **none** |
+| off | 4,000 | `stop` | 336 | 272 words |
+| **`medium`** | **14,000** | **`stop`** | **10,563** | **418 words** |
+
+**`reasoning_effort` is not a control here.** `low` spent the identical 8,000 tokens and
+returned the identical nothing. Whatever that parameter does to this model on this task, it
+does not shorten the reasoning.
+
+**The budget is the control, and the number needed is about 10,600.** The reasoning alone
+runs to ~6,900 tokens; the rewrite follows it inside the same completion. At 8,000 the cap
+lands mid-thought, and because the answer had not started yet, `content` is empty — the
+call looks like a total failure rather than a truncation.
+
+So `max_improved_tokens` goes to **12,000**. Headroom above the 10,563 observed, and well
+under the ceiling: `ctx_size` is 16384 against a ~1,400-token prompt, so about 14,900 is
+available. Raising `ctx_size` is not required and would cost KV cache for nothing.
+
+**This vindicates CLAUDE.md section 8's "it runs with thinking on".** The thinking-on
+answer came back at 418 words against the 420-word ceiling — the best-calibrated length
+of anything measured here — while the thinking-off draw came back at 272, a third short of
+the original, which section 8 forbids. Thinking is what holds the word ceiling while the
+model invents new material, exactly as section 8 claims. (Two earlier thinking-off retries
+in the pipeline gave 426 and 387 words, so 272 is one draw and not a reliable shortfall.
+The point stands either way: with the budget raised there is no reason to find out.)
+
+Note that section 10.2's sampling table lists `correct` as thinking **off**, which reads as
+a contradiction of section 8. It is not quite one — the table predates the split into
+`correct_minimal` and `correct_improved`, and 8 is the specific case — but the table should
+say so rather than leave the reader to reconcile them.
+
+**It is also not slower.** The old path spent ~360 s failing and then ~35 s on the retry
+to produce a short rewrite; the new one spends ~415 s and produces a correctly sized one.
+With MTP on (7.6i) that comes down to about four minutes.
+
+### 7.6h Recommendation
+
+**On a card in the 15-16 GB band, IQ4_XS is the better High Quality option**, by a wide
+margin: seven to eight times the transcription speed and three times the marking speed of
+Q4_K_M, with a transcript differing in three words out of four hundred and a report that
+is its equal or better.
+
+That is a different result from section 7.3's finding on IQ3_XXS, and it does not
+contradict it. 7.3 measured a *sub-4-bit* quant on a *10 GB* card, where nothing fits and
+IQ3 bought nothing but 3.6 GB. IQ4_XS is a 4-bit quant that fits a 16 GB card whole, which
+is the only thing that was ever wrong with Q4_K_M here. The step change 7.3 identified —
+between sub-4-bit and 4-bit — is intact; IQ4_XS is on the right side of it.
+
+**Adopted, at the operator's instruction.** "High Quality" now names IQ4_XS. The dropdown
+is still two models plus Port, so CLAUDE.md section 13 is unaffected — only which file the
+first entry points at has changed. What moved:
+
+- `hardware.MODELS` — the `q4_k_m` row becomes `iq4_xs`, `size_gb: 13.54`
+- `Q4_MIN_VRAM_MB` renamed `HQ_MIN_VRAM_MB`, value unchanged at 15000; it no longer
+  refers to a Q4_K_M-sized model and the old name would have been a lie
+- the `hardware.py` module docstring
+- `app.js`, which compared `d.recommended === "q4_k_m"` to decide whether the note says
+  High or Low Quality — a silent wrong-label bug if left
+- `run.bat`'s missing-weights warning
+- `DOWNLOAD_MODELS.bat`, which needed a second repository: this quant is not Unsloth's.
+  The revision was taken from the HF API and the pinned URL checked for a 302 to the CDN
+  carrying the right filename, rather than assumed.
+
+Verified after the change: `choose_key` returns `iq4_xs` at 16311 MiB and `iq2_xxs` at
+12288 and 8192; `offload_regex('iq4_xs', 16311)` is empty (fully on the GPU) and at
+15000 MiB it is a seven-block offload. The threshold logic needed no change — on a 10 GB
+card IQ4_XS would offload heavily and the 15000 gate keeps it off, exactly as it kept
+Q4_K_M off.
+
+The two silent corrections in 7.6c are the price, and they are the same class of error
+section 6 already documents at every quantisation — one instance more, not a new failure.
+
+### 7.6i MTP was not enabled, and enabling it is worth 1.77x
+
+The model card for this quant quotes "64k context with MTP at 50 t/s" against "128k
+without MTP at around 30 t/s" and gives no flag, so the first run here did not have it on.
+The server log said so plainly and it was missed:
+
+```
+W model has unused tensor blk.64.nextn.eh_proj.weight (size = 27852800 bytes) -- ignoring
+```
+
+`blk.64` is the multi-token-prediction layer — the comment above `NUM_LAYERS` in
+`hardware.py` already says the 65th block is the MTP layer — and thirteen of those
+warnings mean the whole thing was loaded and thrown away.
+
+**The flag in this build is `--spec-type draft-mtp`**, from the speculative-decoding
+family (`--spec-type none,draft-simple,draft-eagle3,draft-mtp,...`). With it the thirteen
+warnings drop to zero and the server logs
+`common_speculative_init_result: creating MTP draft context against the target model`.
+
+Measured, identical request, one server on the card at a time, 2,500 generated tokens:
+
+| | tok/s | VRAM with the projector loaded |
+|---|---|---|
+| IQ4_XS, no MTP | 25.8 | 14.9 GB |
+| **IQ4_XS, `--spec-type draft-mtp`** | **45.7** | **15.7 GB** |
+
+1.77x, which is close enough to the card's 50-against-30 to believe the mechanism.
+
+**A caution about four contaminated readings**, recorded because they nearly became a
+finding. Controls came back at 7.8, 9.7, 11.9 and 6.1 tok/s before one came back at 25.8.
+Nothing was wrong with the model: the server runs `--parallel 1`, and every one of those
+low numbers was taken while a second request — another benchmark of mine, or a second
+resident server — was sharing the card. Measured alone it is 25.8, which is also what the
+full pipeline had independently logged before any of this.
+
+The lesson is procedural: on this card **one request to one server at a time**, or the
+number measures the queue. A 2-4x understatement from concurrency looks identical to the
+genuine 3x penalty Q4_K_M pays in 7.6a, and the two are easy to confuse.
+
+**It is gated, because IQ2_XXS has no MTP layer.** Scanning the GGUF tensor names
+directly: IQ4_XS and Q4_K_M both carry `blk.64.*`, and the Unsloth IQ2_XXS does not, so
+Low Quality would otherwise be handed a flag its weights cannot honour. `model_has_mtp`
+reads the file rather than trusting a table, and **two things about that scan cost a
+cycle each:**
+
+- **The discriminator must be `blk.64.`, not `nextn`.** The string `nextn` sits around
+  offset 1,400 of *both* quantisations, in the architecture metadata — the model declares
+  that it has an MTP design whether or not this particular file kept the weights for it.
+  A scan for `nextn` enables MTP on IQ2_XXS and is wrong in the dangerous direction.
+- **The tensor names are about 11 MB in**, behind the tokenizer vocabulary. An 8 MB
+  window was tried first and reported *no MTP layer* for every model on disk — which
+  fails silently, costs 1.77x, and looks exactly like a model that simply has no MTP. It
+  now reads in chunks to a 64 MB ceiling, overlapping by the pattern length so a name
+  straddling a chunk boundary is still found.
+
+It is also off on the CPU build: drafting spends compute to save memory bandwidth, which
+is the wrong way round when there is no GPU being starved.
+
+### 7.6j MTP measured on the real pipeline, images included
+
+The benchmark in 7.6i is text-only, so the vision encoder's image buffer was never
+allocated — and transcription is the path the whole app rests on. Re-measured through the
+app itself on the same two photographs:
+
+| | without MTP | with MTP |
+|---|---|---|
+| Transcribe | 14, 15 s/page at 17-19 tok/s | **11, 11 s/page at 22-26 tok/s** |
+| Marking call | 322 s at 25 tok/s | **150 s at 45 tok/s** |
+| Correction | 23 s at 22 tok/s | **at 55 tok/s** |
+| Peak VRAM, both pages encoded | — | **15,837 MiB of 16,311** |
+
+**474 MB spare at peak**, sampled every second across both image encodes, and no
+allocation failure. `OVERHEAD_GB` stays at 2.0: raising it to cover the draft context
+would compute an FFN offload for a model that demonstrably fits, which is the worse
+mistake of the two per the note on that constant.
+
+474 MB is not much. It is enough here because the projector, the KV cache at ctx 16384 and
+the encode scratch are all sized up front, so the peak is reached on the first page and
+does not grow with the composition. A card reporting appreciably under 16 GB takes an FFN
+offload instead and has room by construction.
+
 ## 8. Acceptance tests (CLAUDE.md section 14)
 
 | # | Test | Status |
 |---|---|---|
-| 1 | Transcript matches the page including its mistakes; quotes verbatim | **Partly** — quotes verbatim, one misspelling silently corrected (section 6) |
+| 1 | Transcript matches the page including its mistakes; quotes verbatim | **Partly** — quotes verbatim, but silent corrections persist on real handwriting: two misspellings at every quant, plus a verb tense and a possessive on IQ4_XS (sections 6, 7.6c) |
 | 2 | Same script at different levels scores differently | **Pass** — 79 / 71 / 39 across P2 / P4 / S4 |
 | 3 | Chinese: English feedback, Chinese quotes and rewrites | **Pass** (section 5.6) |
 | 4 | Pages reordered in the UI are read in the order shown | **Pass** — verified in the browser: two pages uploaded in reverse, sorted by filename on arrival, reordered with the arrows, numbering followed |
-| 5 | Portrait phone photograph with EXIF rotation | **Not tested** — no phone photo available; the code path is `imageOrientation: "from-image"` |
+| 5 | Portrait phone photograph with EXIF rotation | **Pass** — two portrait phone photographs of a real P4 script went through the browser resize and were read the right way up, twice (sections 7.6b-c) |
 | 6 | A photograph that is not a composition gives a plain message | **Not tested** |
 | 7 | Generate with "both" writes two files that differ, and opens the folder | **Pass** after the section 7.1 fix; it failed before it |
 | 8 | Cancel during transcription | **Not tested** |
@@ -706,8 +1016,8 @@ worth keeping.
 | 11 | Copy the folder to another drive and run | **Not tested** |
 | 12 | Deleting an output folder removes it from history | **Pass** — the list is built from the folders |
 
-Tests 5, 6, 8, 10 and 11 are the ones worth running before this is given to anybody. None
-of them needs a model download; 5 and 6 need a phone.
+Tests 6, 8, 10 and 11 are the ones worth running before this is given to anybody. None of
+them needs a model download; 6 needs a phone.
 
 ---
 
@@ -762,9 +1072,12 @@ one-line diagnosis, and it is six lines of logging rather than cleaning.
 
 ## 9. Still not measured
 
-- **Real handwriting.** Everything above used a rendered font. A child's actual
-  handwriting is the real test and the numbers in section 6 will get worse, not better.
-- **A 16 GB card**, where Q4_K_M is the default and the offload is small.
+- **Real handwriting** — first measured in section 7.6, on one P4 script. Section 6's
+  numbers are still font-rendered. The prediction that real handwriting would be worse
+  held for IQ2_XXS and did not for the 4-bit quants, which read that page almost exactly.
+  One script is not a sample; more pages, more hands, and pencil.
+- ~~**A 16 GB card**~~ — measured, section 7.6. The offload is not small: 15 FFN blocks,
+  and Q4_K_M runs at a third of the speed of a quant that fits whole.
 - **Unified memory.** The CPU path is inherited from the Meeting Summariser and should
   work, but the vision encode on the processor is new and unmeasured. A UMA machine is
   quoted per page in the UI for this reason.

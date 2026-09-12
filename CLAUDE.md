@@ -472,7 +472,16 @@ shares the same memory bus.
 |---|---|---|---|---|
 | transcribe | off | 0.2 | 0.9 | copying, not composing |
 | mark | **on**, `medium` | 0.7 | 0.8 | one call, and it is a judgement |
-| correct | off | 0.7 | 0.8 | the shape of the answer is already fixed |
+| correct, minimal | off | 0.7 | 0.8 | the shape of the answer is already fixed |
+| correct, improved | **on**, `medium` | 0.7 | 0.8 | it holds a plot, a level and a word ceiling at once — see §8 |
+
+The two corrections are listed separately because they want opposite things. The minimal
+one is mechanical and reasoning buys it nothing. The improved one needs it, and needs the
+room for it: **budget the improved call at least 12,000 tokens.** `max_tokens` covers the
+reasoning as well as the answer, and at 8,000 the cap landed mid-thought and the call
+returned an empty `content` — a total failure rather than a truncation, on every
+quantisation tried. `reasoning_effort` does not help: `low` spent the same 8,000 and also
+returned nothing. See BUILD_NOTES §7.6g.
 
 `reasoning_effort` accepts **`xhigh`, `medium`, `low` only**. Anything else raises inside
 the Jinja template and surfaces as HTTP 500, so validate before dispatch.
@@ -503,7 +512,7 @@ Single page, no framework, no bundler, no CDN. Everything served locally.
    and a remove button. The arrows are not decoration: dragging is unusable by keyboard
    and fiddly on a laptop trackpad.
 
-   **Double-clicking a thumbnail opens the page full size**, with paging and arrow keys.
+   **Clicking a thumbnail opens the page full size**, with paging and arrow keys.
    A 132px thumbnail is enough to see that a page is upside down and not enough to tell
    page 3 from page 4 — which is exactly the judgement the reordering controls exist to
    support, so the strip has to be able to answer it.

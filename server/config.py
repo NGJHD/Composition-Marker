@@ -179,6 +179,10 @@ _DEFAULTS = {
         # the image encoder, not part of the language weights.
         "mmproj": "mmproj-F16.gguf",
         "mmproj_offload": "auto",
+        # "auto" uses the model's own MTP layer as a draft model where the
+        # weights carry one; "off" disables it. 1.77x measured, at 0.8 GB of
+        # VRAM. BUILD_NOTES section 7.6i.
+        "mtp": "auto",
         # NOT 8080. That is llama.cpp's own default, so it is exactly the port
         # an operator's own llama-server will be sitting on -- and the Port
         # option in the model dropdown exists to talk to one of those. Two
@@ -204,8 +208,15 @@ _DEFAULTS = {
         "max_mark_tokens": 12000,
         "max_correct_tokens": 4000,
         # The improved rewrite runs with thinking on and writes a whole
-        # composition, so it needs room for both.
-        "max_improved_tokens": 8000,
+        # composition, so it needs room for both -- and 8,000 was not room for
+        # both. Measured on a 400-word P4 script: the reasoning alone runs to
+        # ~6,900 tokens and the whole call lands at 10,563, so at 8,000 it hit
+        # the cap mid-thought and returned no answer at all, on Q4_K_M and
+        # IQ4_XS alike. 12,000 leaves headroom without approaching ctx_size,
+        # which at 16384 against a ~1,400-token prompt allows about 14,900.
+        # reasoning_effort is not the lever here: "low" spent the same 8,000
+        # and also returned nothing. BUILD_NOTES section 7.6g.
+        "max_improved_tokens": 12000,
     },
     "thinking": {
         # Transcription is mechanical: reasoning about handwriting produces

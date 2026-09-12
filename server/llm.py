@@ -208,6 +208,17 @@ class LlamaServer:
             cmd += ["--device", device_id]
         if regex:
             cmd += ["--override-tensor", regex]
+
+        # Speculative decoding off the model's own block-64 MTP layer: no
+        # second file, no draft model to size, 1.77x measured. Gated on the
+        # layer actually being in these weights, because the low-quality quant
+        # does not keep it -- see hardware.model_has_mtp. Off on the CPU build:
+        # drafting spends compute to save memory bandwidth, which is the wrong
+        # way round when there is no GPU to be starved.
+        if (str(self.llm.get("mtp", "auto")) != "off"
+                and layers != "0"
+                and hardware.model_has_mtp(model)):
+            cmd += ["--spec-type", "draft-mtp"]
         return cmd
 
     def start(self) -> None:
