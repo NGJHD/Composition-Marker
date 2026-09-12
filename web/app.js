@@ -1019,6 +1019,8 @@
 
   function openAbout() {
     show("about", true);
+    updateIdle();
+    $("update-status").textContent = "";
     fetch("/api/about")
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -1029,6 +1031,152 @@
         link.href = d.repo_url || "#";
       })
       .catch(function () { $("about-version").textContent = "unknown"; });
+  }
+
+
+  /* ---------------------------------------------------------------- updates */
+
+  // The only part of this page that talks to anything but 127.0.0.1, and only
+  // when the button is pressed. The server does the talking; this just asks.
+
+  var updateFound = null;
+
+  function mb(bytes) {
+    return (bytes / 1048576).toFixed(1) + " MB";
+  }
+
+  function updateIdle() {
+    show("update-found", false);
+    show("update-progress", false);
+    $("update-check").disabled = false;
+  }
+
+  $("update-check").addEventListener("click", function () {
+    var status = $("update-status");
+    $("update-check").disabled = true;
+    status.textContent = "Checking…";
+    show("update-found", false);
+
+    fetch("/api/update/check", { method: "POST" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        $("update-check").disabled = false;
+        if (!d.ok) { status.textContent = d.error || "The check failed."; return; }
+        if (!d.newer) {
+          status.textContent = "Version " + d.current + " is the latest.";
+          return;
+        }
+        status.textContent = "";
+        updateFound = d;
+        show("update-found", true);
+
+        var size = d.asset && d.asset.size ? " (" + mb(d.asset.size) + ")" : "";
+        $("update-found-msg").textContent =
+          "Version " + d.latest + " is available" + size + ". You have " +
+          d.current + "." + (d.why ? " " + d.why : "");
+
+        // Install only when the server said it is installable: the release has
+        // a zip and this folder can be written to. Otherwise the link is the
+        // honest offer.
+        show("update-install", !!d.installable);
+        var link = $("update-link");
+        link.href = d.url || "#";
+        link.hidden = !!d.installable;
+      })
+      .catch(function () {
+        $("update-check").disabled = false;
+        status.textContent = "The check could not be completed.";
+      });
+  });
+
+  $("update-install").addEventListener("click", function () {
+    if (!updateFound || !updateFound.asset) return;
+    show("update-found", false);
+    show("update-progress", true);
+    $("update-check").disabled = true;
+    $("update-bar").style.width = "0%";
+    $("update-progress-msg").textContent = "Starting the download…";
+
+    fetch("/api/update/install", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset: updateFound.asset, tag: updateFound.latest })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error) {
+          show("update-progress", false);
+          $("update-status").textContent = d.error;
+          $("update-check").disabled = false;
+          return;
+        }
+        pollUpdate();
+      })
+      .catch(function () {
+        show("update-progress", false);
+        $("update-status").textContent = "The update could not be started.";
+        $("update-check").disabled = false;
+      });
+  });
+
+  $("update-cancel").addEventListener("click", function () {
+    fetch("/api/update/cancel", { method: "POST" }).catch(function () {});
+    $("update-progress-msg").textContent = "Cancelling…";
+  });
+
+  // Bytes, not just a percentage: "48.2 MB of 248.8 MB" says whether it is
+  // stuck and a bare bar does not.
+  function pollUpdate() {
+    fetch("/api/update/progress")
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var label = {
+          downloading: "Downloading",
+          unpacking: "Unpacking",
+          verifying: "Checking the download",
+          ready: "Restarting to finish the update"
+        }[d.phase] || "Working";
+
+        if (d.phase === "downloading" && d.total) {
+          $("update-bar").style.width =
+            Math.min(100, (d.received / d.total) * 100) + "%";
+          $("update-progress-msg").textContent =
+            label + " — " + mb(d.received) + " of " + mb(d.total);
+        } else {
+          $("update-progress-msg").textContent = label + "…";
+          if (d.phase !== "downloading") $("update-bar").style.width = "100%";
+        }
+
+        // Nothing left to abort once the bytes are down, so the button stops
+        // offering.
+        $("update-cancel").hidden = !d.cancellable;
+
+        if (d.phase === "failed") {
+          show("update-progress", false);
+          $("update-status").textContent =
+            d.message || "The update could not be applied.";
+          $("update-check").disabled = false;
+          return;
+        }
+        if (d.phase === "ready") {
+          // The server is about to exit and the browser will lose it. Say so
+          // here, because the page cannot follow a restart it does not control.
+          $("update-progress-msg").textContent =
+            "Installing. This window will stop responding for a moment, and " +
+            "the application will reopen by itself. If it does not, run " +
+            "run.bat again.";
+          $("update-cancel").hidden = true;
+          return;
+        }
+        setTimeout(pollUpdate, 400);
+      })
+      .catch(function () {
+        // A failed poll during the handover is expected: the server has gone.
+        $("update-progress-msg").textContent =
+          "Installing. The application will reopen by itself. If it does " +
+          "not, run run.bat again.";
+        $("update-cancel").hidden = true;
+      });
   }
 
   $("about-open").addEventListener("click", openAbout);

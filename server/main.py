@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import atexit
 import json
+import os
 import signal
 import threading
 import time
@@ -24,7 +25,7 @@ from fastapi.responses import (
     StreamingResponse,
 )
 
-from . import calibration, config, hardware, jobs, levels, pipeline, version
+from . import calibration, config, hardware, jobs, levels, pipeline, updater, version
 
 ACCEPTED_MAGIC = (b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n")
 
@@ -620,6 +621,106 @@ async def open_output(request: Request):
         return JSONResponse({"error": "Couldn't open the folder."}, status_code=500)
     return {"ok": True}
 
+
+
+# ---------------------------------------------------------------------------
+# updates
+# ---------------------------------------------------------------------------
+#
+# The only outbound requests in the application, and only on a button press.
+# See server/updater.py and CLAUDE.md section 0.
+
+@app.post("/api/update/check")
+async def update_check() -> dict:
+    """Ask GitHub what the latest release is. Answers, never raises."""
+    def work():
+        try:
+            return {"ok": True, **updater.check()}
+        except updater.UpdateError as exc:
+            return {"ok": False, "error": str(exc)}
+        except Exception as exc:  # noqa: BLE001
+            jobs.log_exception(exc)
+            return {"ok": False,
+                    "error": "The check could not be completed. Nothing has "
+                             "been changed."}
+
+    # urllib is blocking, and holding the event loop would stall the progress
+    # stream of a job running at the same time.
+    return await asyncio.to_thread(work)
+
+
+@app.post("/api/update/install")
+async def update_install(request: Request):
+    """Download, verify, stage, then stop the server so the script can copy.
+
+    Refused while a job is running: the update ends with this process exiting,
+    and taking a marking run down with it -- along with the llama-server it
+    owns -- is not something to do behind the user's back.
+    """
+    if jobs.active() is not None:
+        return JSONResponse(
+            {"error": "Something is being marked. Wait for it to finish, or "
+                      "cancel it, then update."}, status_code=409)
+    if updater.STATE.snapshot()["phase"] in ("downloading", "unpacking",
+                                             "verifying", "ready"):
+        return JSONResponse({"error": "An update is already in progress."},
+                            status_code=409)
+
+    body = await request.json()
+    asset = body.get("asset") or {}
+    tag = str(body.get("tag") or "")
+    url = str(asset.get("url") or "")
+    # Only ever a release asset from this app's own repository. A URL arriving
+    # from the page is not trusted to point anywhere it likes.
+    if not updater.is_our_asset_url(url):
+        return JSONResponse(
+            {"error": "That download does not come from this application's "
+                      "own releases, so it was refused."}, status_code=400)
+
+    def work():
+        try:
+            updater.install({"url": url, "size": int(asset.get("size") or 0)},
+                            tag, _stop_for_update)
+            return {"ok": True}
+        except updater.UpdateError as exc:
+            return {"ok": False, "error": str(exc)}
+        except Exception as exc:  # noqa: BLE001
+            jobs.log_exception(exc)
+            return {"ok": False,
+                    "error": "The update could not be applied. Nothing has "
+                             "been changed."}
+
+    threading.Thread(target=work, name="update", daemon=True).start()
+    return {"ok": True, "started": True}
+
+
+@app.get("/api/update/progress")
+async def update_progress() -> dict:
+    return updater.STATE.snapshot()
+
+
+@app.post("/api/update/cancel")
+async def update_cancel() -> dict:
+    updater.STATE.cancel.set()
+    return {"ok": True}
+
+
+def _stop_for_update() -> None:
+    """Release the lock the .cmd is waiting on.
+
+    A moment's delay so the browser's last poll gets an answer and the page can
+    say what is happening, then the same cleanup every other exit path runs --
+    llama-server down, VRAM back -- and then the process ends. os._exit rather
+    than a signal: uvicorn's graceful shutdown waits on open connections, and
+    the update page is holding one.
+    """
+    def bye():
+        time.sleep(1.5)
+        jobs.shutdown_all()
+        jobs.clear_running()
+        os._exit(0)
+
+    threading.Thread(target=bye, name="update-exit", daemon=True).start()
 
 # ---------------------------------------------------------------------------
 # lifecycle

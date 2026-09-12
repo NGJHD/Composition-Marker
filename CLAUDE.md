@@ -18,8 +18,22 @@ where it was changed, the reason is given. `BUILD_NOTES.md` records what was mea
 
 1. **No internet access at runtime.** Not for models, not for fonts, not for CDN scripts,
    not for telemetry. The app must work with the network adapter physically disabled.
-   Unlike the Meeting Summariser there is no update button, so there is **no exception**:
-   this application makes no outbound request, ever.
+
+   **The one exception, added at the operator's instruction, is the Check for updates
+   button in the About overlay.** It was originally specified not to exist, and this
+   paragraph said "no outbound request, ever"; that is no longer true and the reversal is
+   recorded rather than quietly applied. The exception is narrow and must stay narrow:
+
+   - Nothing is requested unless the user presses the button. No check on launch, no
+     periodic poll, no telemetry, no "phone home" of any kind.
+   - The only hosts contacted are `api.github.com` and `github.com`, and the only URL
+     downloaded is a release asset whose prefix is verified against this app's own
+     repository (`updater.is_our_asset_url`).
+   - Every other code path still talks to nothing but `127.0.0.1`. A machine whose user
+     never presses the button never resolves a hostname, so acceptance test 10 — a full
+     marking run with the adapter disabled — remains true and remains required.
+   - The child's work is never part of any request. The update path sends nothing but an
+     HTTP GET; no composition, no photograph, no report, no identifier.
 2. **No installation steps.** The end user unzips a folder and double-clicks `run.bat`.
    No Python installer, no CUDA toolkit, no pip.
 3. **No PyTorch.** Anywhere. This is the constraint that shapes the whole architecture.
@@ -650,7 +664,9 @@ composition behind it and returns to that.
   it: nothing is written outside the folder.
 - Do not add any dependency that pulls in torch, transformers, or the HuggingFace hub
   client. If you find yourself needing one, stop and report it.
-- Do not reference any external URL from the frontend.
+- Do not reference any external URL from the frontend, with the single exception of
+  the update button's link to this app's own GitHub release page (§0). No fonts, no
+  CDN scripts, no analytics, no images.
 - Do not bind the server to anything except `127.0.0.1`.
 - Do not write to `%APPDATA%`, `%USERPROFILE%` or the registry. Everything stays inside
   the app folder so the whole thing is portable and deletable.
@@ -678,7 +694,9 @@ The build is done when all of these pass:
 8. Cancel during transcription stops within one page, llama-server exits, VRAM is
    released, and a new job starts cleanly.
 9. Force-quit the console mid-job: no orphaned `llama-server.exe` in Task Manager.
-10. **With the network adapter disabled**, a full run succeeds.
+10. **With the network adapter disabled**, a full run succeeds — pages in, report out,
+    corrections generated. Only Check for updates may fail, and it must fail with a
+    sentence about the connection rather than a traceback.
 11. Copy the entire folder to a different drive letter and run it: works unchanged.
 12. Deleting a composition's folder from `output\` removes it from the history list.
 

@@ -411,6 +411,27 @@ input:focus, select:focus, .btn:focus-visible {
   font-size: 12.5px; color: var(--ink-faint); line-height: 1.55;
 }
 
+/* ---- the update panel, inside About ---- */
+
+.update {
+  margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid var(--rule-soft);
+}
+.update-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.update-row + .update-row { margin-top: 10px; }
+.update-status { font-size: 13px; color: var(--ink-soft); }
+.update-msg {
+  margin: 10px 0; font-size: 13px; color: var(--ink-soft); line-height: 1.55;
+}
+.update-link { font-size: 13px; color: var(--ink); text-underline-offset: 2px; }
+/* The update's own bar is thinner than the job bar: this is a download, not
+   the thing the user came here to do. */
+#update-progress .bar { height: 6px; margin: 4px 0 0; }
+/* .btn.primary carries margin-left:auto so the Mark button sits at the right
+   of its row. In here that would shove the install button away from the text
+   explaining what it installs. */
+.update .btn.primary { margin-left: 0; }
+
 /* ---- full-size page viewer ---- */
 
 /* Darker than the About sheet's backdrop: this is for reading handwriting, so

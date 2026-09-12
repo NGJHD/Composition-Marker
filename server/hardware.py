@@ -80,6 +80,15 @@ FFN_FRACTION = 0.67
 # wrote and then corrected the child for the fragment it had just created. It
 # is the right choice for a machine that cannot hold anything larger and the
 # wrong one for a machine that can, which is exactly what detection decides.
+# rewrite_thinking is a property of the quantisation, not a preference, which
+# is why it lives here rather than only in config.json. The improved rewrite
+# reasons for ten thousand tokens or more before it writes anything, and a
+# 2-bit model cannot hold a task together over that distance: section 8a of
+# BUILD_NOTES records IQ2_XXS emitting a hallucinated closing tag, arguing with
+# itself in the output and then locking into a repetition loop once its
+# instruction grew. Section 7.3 measured it producing a perfectly acceptable
+# grounded rewrite *without* reasoning. It is also the model chosen for the
+# smallest cards, where ten thousand tokens of thinking is many minutes.
 MODELS = [
     {
         "key": "iq4_xs",
@@ -87,6 +96,7 @@ MODELS = [
         "label": "High Quality: Qwen3.8-27B-i1-IQ4_XS",
         "size_gb": 13.54,
         "min_vram_mb": HQ_MIN_VRAM_MB,
+        "rewrite_thinking": True,
     },
     {
         "key": "iq2_xxs",
@@ -94,6 +104,7 @@ MODELS = [
         "label": "Low Quality: Qwen3.8-27B-UD-IQ2_XXS",
         "size_gb": 7.3,
         "min_vram_mb": 0,
+        "rewrite_thinking": False,
     },
 ]
 
@@ -403,6 +414,20 @@ def resolve_key(requested: str, vram_mb: int | None = None) -> str:
 def model_path(key: str):
     return config.models_dir() / BY_KEY[key]["file"]
 
+
+
+
+def rewrite_thinking(key: str, default: bool = True) -> bool:
+    """Whether this model should reason before the improved rewrite.
+
+    The external "Port" option has no entry here and no known weights, so it
+    takes the configured default: the operator chose it and knows what they
+    are running.
+    """
+    model = BY_KEY.get(key)
+    if model is None:
+        return default
+    return bool(model.get("rewrite_thinking", default))
 
 
 # ---------------------------------------------------------------------------

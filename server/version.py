@@ -12,10 +12,17 @@ import re
 
 APP_NAME = "Composition Marker"
 APP_AUTHOR = "Darren Ng"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 GITHUB_REPO = "NGJHD/Composition-Marker"
 REPO_URL = "https://github.com/%s" % GITHUB_REPO
+
+# Which asset on a release is the one to install. The release carries the
+# source only -- bin\, models\ and runtime\ are 23 GB of payload that an
+# update never needs to touch, because robocopy leaves what it does not carry
+# alone. The tag must match APP_VERSION exactly or the updater refuses the
+# download rather than installing a version that disagrees with its own label.
+ASSET_SUFFIX = "-source.zip"
 
 
 def parse_version(text: str):

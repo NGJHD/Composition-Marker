@@ -15,7 +15,10 @@
     "max_transcribe_tokens": 2000,
     "max_mark_tokens": 12000,
     "max_correct_tokens": 4000,
-    "max_improved_tokens": 12000
+    "max_improved_tokens": 12000,
+    "rewrite_min_ratio": 0.95,
+    "rewrite_max_ratio": 1.05,
+    "rewrite_length_attempts": 3
   },
   "thinking": {
     "transcribe": false,

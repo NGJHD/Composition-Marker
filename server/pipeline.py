@@ -22,7 +22,7 @@ import re
 import time
 from pathlib import Path
 
-from . import calibration, config, levels, llm
+from . import calibration, config, hardware, levels, llm
 from .jobs import Cancelled, Job, JobError
 
 NO_TEXT = "NO_TEXT_FOUND"
@@ -373,6 +373,13 @@ def _word_cap(composition: str, language: str, headroom: float = 1.05) -> tuple:
     return ("%d words" % n, "%d words" % math.ceil(n * headroom))
 
 
+def _length_of(text: str, language: str) -> int:
+    """Words, or 字 for Chinese. The same unit the cap is expressed in."""
+    if language == "zh":
+        return len(_CJK.findall(text))
+    return len(text.split())
+
+
 def correct(job: Job, server: llm.LlamaServer, cfg: dict, composition: str,
             kind: str) -> str:
     original_words, max_words = _word_cap(composition, job.language)
@@ -403,19 +410,104 @@ def correct(job: Job, server: llm.LlamaServer, cfg: dict, composition: str,
     thinking = cfg["thinking"]
     think = bool(thinking.get("correct_%s" % kind,
                               thinking.get("correct", False)))
-    text = server.chat(
-        prompt,
-        thinking=think,
-        effort=str(thinking.get("correct_effort", "medium")),
-        max_tokens=int(cfg["llm"].get(
-            "max_improved_tokens" if kind == "improved" else "max_correct_tokens",
-            8000 if kind == "improved" else 4000)),
-        temperature=0.7,
-        top_p=0.8,
-        stage="correct-%s" % kind,
-    )
+    # config.json is the master switch; the model gets a veto. Reasoning for
+    # ten thousand tokens before writing is something only the larger quant
+    # can hold together, and it is the smaller one that runs on the cards
+    # where those tokens cost minutes. hardware.rewrite_thinking has the
+    # measurements.
+    if think and kind == "improved" and not hardware.rewrite_thinking(job.model_key):
+        think = False
+        job.log("rewrite: thinking off for %s" % (job.model_key or "this model"))
+    max_tokens = int(cfg["llm"].get(
+        "max_improved_tokens" if kind == "improved" else "max_correct_tokens",
+        8000 if kind == "improved" else 4000))
+
+    def one(thinking_on: bool) -> str:
+        return _keep_title(composition, _clean_page(server.chat(
+            prompt,
+            thinking=thinking_on,
+            effort=str(thinking.get("correct_effort", "medium")),
+            max_tokens=max_tokens,
+            temperature=0.7,
+            top_p=0.8,
+            stage="correct-%s" % kind,
+        )))
+
+    text = one(think)
+    if kind == "improved":
+        text = _hold_the_length(job, cfg, composition, text, one)
     calibration.record(job.model_key, "correct", time.time() - started)
-    return _keep_title(composition, _clean_page(text))
+    return text
+
+
+def _hold_the_length(job: Job, cfg: dict, composition: str, text: str,
+                     again) -> str:
+    """Re-ask for the rewrite until it is the length it was told to be.
+
+    Section 8 gives the improved rewrite two length rules -- never come back
+    shorter than the original, and never exceed 105% of it -- and the prompt
+    states the ceiling as a hard number. The model still misses it, and the
+    checkable half of that is arithmetic, so it is checked rather than trusted.
+    This is the same argument section 8 makes for restoring the title in code:
+    where a requirement is mechanical, do it mechanically.
+
+    Measured on one 399-word script, against a 95-105% band:
+
+        thinking on     398, 409, 418          3 of 3 inside
+        thinking off    402, 341, 341, 456     1 of 4 inside
+        after a blown token budget   407, 201  1 of 2 inside
+
+    So the first attempt keeps whatever `thinking.correct_improved` says, and
+    **the retries run with thinking off** -- at the operator's instruction, and
+    it is the right way round for the cost: a thinking retry is three to four
+    minutes and a plain one is twenty seconds, so several cheap attempts buy
+    more than one expensive one. A third of them land, which is why there is
+    more than one.
+
+    If none lands, the closest attempt is returned rather than the last. A
+    rewrite slightly outside the band is a document; no rewrite is not.
+    """
+    lang = job.language
+    target = _length_of(composition, lang)
+    if target <= 0:
+        return text
+
+    lo = float(cfg["llm"].get("rewrite_min_ratio", 0.95))
+    hi = float(cfg["llm"].get("rewrite_max_ratio", 1.05))
+    tries = int(cfg["llm"].get("rewrite_length_attempts", 3))
+    unit = "characters" if lang == "zh" else "words"
+
+    def inside(n: int) -> bool:
+        return target * lo <= n <= target * hi
+
+    best, best_n = text, _length_of(text, lang)
+    if inside(best_n):
+        return text
+
+    for attempt in range(1, max(0, tries) + 1):
+        job.log(
+            "rewrite: %d %s against %d (%d-%d allowed) - asking again (%d/%d)"
+            % (best_n, unit, target, round(target * lo), round(target * hi),
+               attempt, tries)
+        )
+        job.check_cancelled()
+        candidate = again(False)
+        n = _length_of(candidate, lang)
+        if inside(n):
+            job.log("rewrite: %d %s, within range" % (n, unit))
+            return candidate
+        # "Closest" is measured against the band, not the original, so a
+        # rewrite 2% over the ceiling beats one 20% under the floor.
+        def miss(v: int) -> float:
+            return max(target * lo - v, v - target * hi, 0)
+
+        if miss(n) < miss(best_n):
+            best, best_n = candidate, n
+
+    job.log("rewrite: %d %s, still outside %d-%d after %d tries - keeping the "
+            "closest" % (best_n, unit, round(target * lo),
+                         round(target * hi), tries))
+    return best
 
 
 def _keep_title(original: str, rewritten: str) -> str:

@@ -199,9 +199,30 @@
       <dt>Source</dt><dd><a id="about-repo" href="#" target="_blank" rel="noopener noreferrer">&mdash;</a></dd>
     </dl>
 
-    <p class="about-note">This application never uses the internet. The
-      photographs, the handwriting and the marking all stay on this
-      computer.</p>
+    <p class="about-note">The photographs, the handwriting and the marking all
+      stay on this computer. The only time this application uses the internet
+      is when you press the button below.</p>
+
+    <div class="update">
+      <div class="update-row">
+        <button id="update-check" class="btn small" type="button">Check for updates</button>
+        <span id="update-status" class="update-status"></span>
+      </div>
+
+      <div id="update-found" hidden>
+        <p id="update-found-msg" class="update-msg"></p>
+        <div class="update-row">
+          <button id="update-install" class="btn small primary" type="button" hidden>Download and install</button>
+          <a id="update-link" class="update-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Open the release page</a>
+        </div>
+      </div>
+
+      <div id="update-progress" hidden>
+        <div class="bar"><div class="bar-fill" id="update-bar"></div></div>
+        <p class="update-msg" id="update-progress-msg"></p>
+        <button id="update-cancel" class="btn small ghost" type="button">Cancel</button>
+      </div>
+    </div>
   </div>
 </div>
 

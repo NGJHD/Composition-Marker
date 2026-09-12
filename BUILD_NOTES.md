@@ -1036,6 +1036,129 @@ the encode scratch are all sized up front, so the peak is reached on the first p
 does not grow with the composition. A card reporting appreciably under 16 GB takes an FFN
 offload instead and has room by construction.
 
+### 7.6k q4_1 KV at 32k context: fits, and is far too slow
+
+Asked whether dropping the KV cache to `q4_1` would pay for a 32k context. The memory
+arithmetic says yes and the clock says no, decisively.
+
+**The memory is free.** `q8_0` is 8.5 bits per element and `q4_1` is 5.0, so doubling the
+context at 0.59x the cost per element is 1.18x overall — the ~0.53 GB cache becomes
+~0.62 GB. Measured with MTP and the projector loaded:
+
+| | VRAM | context |
+|---|---|---|
+| ctx 16k, KV `q8_0` | 15,837 MiB | 16,384 |
+| ctx 32k, KV `q4_1` | **15,759 MiB** | 32,768 |
+
+Doubling the context came out ~78 MB *ahead*, because the other buffers shrink slightly
+at the same time. `q4_1` is in this build's allowed list and `n_ctx_slot = 32768` was
+granted.
+
+**The speed is not free. It is a 2.7x loss.**
+
+| | `q8_0` @ 16k | `q4_1` @ 32k |
+|---|---|---|
+| Transcribe | 11 s/page, 22-26 tok/s | 29-31 s/page, **8.1-9.3 tok/s** |
+| Marking | 45 tok/s | **14-19 tok/s** |
+
+Almost certainly the CUDA flash-attention kernels: there is a fast path for `q8_0` and
+`f16`, and a dequantise-on-the-fly fallback for `q4_1`. Which knob costs it — the cache
+type or the context length — was not isolated, because the decision does not turn on it:
+`q8_0` at 32k needs about +530 MB of KV against 474 MB of headroom, so it only fits by
+giving up MTP, and MTP is worth 1.77x. Either way `q8_0` at 16k wins.
+
+**Reverted at the operator's instruction after two of three test runs.** `ctx_size` stays
+16384, `cache_type_k/v` stay `q8_0`.
+
+One useful by-product: a **20,000-token budget did contain the rewrite's reasoning**
+(finish `stop`, 6,962 completion tokens). So the unbounded reasoning in 7.6g is bounded
+somewhere above 12,000 and below 20,000 — but reaching it needs a 32k context, and at
+8-9 tok/s a 20,000-token reasoning block is three-quarters of an hour. The budget was
+never the binding constraint; the token rate is. Which leaves the mechanical length check
+below as the right fix.
+
+### 7.6l The rewrite's length is now checked, not trusted
+
+Section 7.6g measured the harm: when the improved rewrite's reasoning blows its budget,
+the retry is a thinking-off call, and one of those returned 201 words against a 399-word
+original. Section 8 gives two length rules — never shorter than the original, never past
+105% of it — and both are arithmetic.
+
+`pipeline._hold_the_length` now checks the finished rewrite and re-asks if it misses. The
+band is 95-105% of the original, three attempts, all three values in `config.json`. The
+floor is 0.95 rather than 1.00 because "not shorter" counted to the word would reject a
+rewrite one word down, which is not what the rule is protecting against.
+
+**The retries run with thinking off**, at the operator's instruction, and the economics
+agree: a thinking retry is three to four minutes and a plain one is about twenty seconds,
+so several cheap attempts buy more than one expensive one. Roughly a quarter of
+thinking-off draws land inside the band on their own, which is why there is more than one
+attempt.
+
+If no attempt lands, **the closest to the band is returned, not the last** — so a rewrite
+2% over the ceiling beats one 20% under the floor. A rewrite slightly outside the band is
+a document; no rewrite is not.
+
+This is the same argument section 8 already makes for the title: where a requirement is
+mechanical, do it mechanically.
+
+### 7.6m Thinking on the rewrite is now per-model, and off for IQ2_XXS
+
+`thinking.correct_improved` was a single global boolean, so the low-quality quant was
+getting the reasoning path too. That is the configuration section 8a records destabilising
+it: with a longer instruction IQ2_XXS emitted a hallucinated closing tag, argued with
+itself in the output and locked into a repetition loop. Section 7.3 separately measured it
+producing a perfectly acceptable grounded rewrite *without* reasoning.
+
+It is also the model chosen for the smallest cards, where ten thousand tokens of thinking
+before the first word of output is many minutes.
+
+So `hardware.MODELS` carries `rewrite_thinking`, true for IQ4_XS and false for IQ2_XXS,
+and `config.json` remains the master switch: setting `correct_improved` false turns it off
+for everything, setting it true does not turn it on for a model that cannot use it. The
+external Port option takes the configured default, since the operator chose it and knows
+what they are running.
+
+### 7.6n The update button, and the constraint it reverses
+
+CLAUDE.md section 0 said there would be no update button and therefore "no outbound
+request, ever". That was reversed at the operator's instruction, and section 0 now records
+the reversal rather than having it applied quietly. The exception is narrow: nothing is
+requested unless the button is pressed, the only hosts are `api.github.com` and
+`github.com`, the download URL's prefix is verified against this app's own repository, and
+the child's work is never part of any request. Acceptance test 10 — a full marking run
+with the adapter disabled — is unchanged and still required.
+
+The workflow is the operator's UPDATE_BUTTON.md, adapted from an Electron app to a folder
+of Python. All five of its traps applied and all five are handled:
+
+| Trap | What it becomes here |
+|---|---|
+| `spawn` refuses a `.cmd` | `cmd.exe /c <script>` with the path as its own argument, never `shell=True` |
+| `tasklist \| find` hangs when detached | wait on the **file lock** of `runtime\python.exe` |
+| unzip without a dependency | `%SystemRoot%\System32\tar.exe`, absolute — `tar` on PATH may be Git's GNU tar, which cannot read zip |
+| copy with robocopy, not xcopy | `/E /R:3 /W:2`, `if errorlevel 8` as the failure test, and **no `/MIR`** |
+| verify before trusting | `APP_VERSION` read out of the downloaded `version.py` by regex, never by importing it |
+
+Two adaptations the guide could not anticipate:
+
+- **The release asset is the source, not the application.** `bin\`, `models\` and
+  `runtime\` are 23 GB of payload that an update never needs to touch, and robocopy
+  leaves what it does not carry alone. So the asset is a few hundred kilobytes and the
+  weights are never re-downloaded.
+- **The version is read by regex rather than by import.** Importing would execute a file
+  just downloaded off the internet *before* it has been verified, which is the wrong
+  order to do those two things in.
+
+`updater.is_our_asset_url` is the one piece with no counterpart in the guide's checklist
+and it earns its place: the download URL arrives at the install endpoint from the page,
+and the path it feeds ends in code being copied over the application. It is checked
+against the repository prefix, and a `..` anywhere in it is refused.
+
+Installing is refused while a job is running. The update ends with this process exiting,
+and taking a marking run and its llama-server down behind the user's back is not a thing
+to do.
+
 ## 8. Acceptance tests (CLAUDE.md section 14)
 
 | # | Test | Status |

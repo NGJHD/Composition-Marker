@@ -225,6 +225,16 @@ _DEFAULTS = {
         # script, not for a JC2 essay. BUILD_NOTES section 7.6g has the two
         # real ways out, both of which are design changes rather than numbers.
         "max_improved_tokens": 12000,
+        # The improved rewrite is checked against these and re-asked if it
+        # misses, because section 8's two length rules -- never shorter than
+        # the original, never past 105% of it -- are arithmetic, and the model
+        # misses them often enough to matter. 0.95 rather than 1.00 as the
+        # floor: "not shorter" counted to the word would fail a rewrite that
+        # is one word down, which is not what the rule is protecting against.
+        # The retries run with thinking off; see pipeline._hold_the_length.
+        "rewrite_min_ratio": 0.95,
+        "rewrite_max_ratio": 1.05,
+        "rewrite_length_attempts": 3,
     },
     "thinking": {
         # Transcription is mechanical: reasoning about handwriting produces
@@ -239,6 +249,12 @@ _DEFAULTS = {
         # step above the child's, a hard word ceiling and a paragraph structure
         # all at once -- it cannot do that without thinking.
         "correct_minimal": False,
+        # The master switch. Each model also gets a veto: the improved
+        # rewrite reasons for ten thousand tokens before writing anything, and
+        # only the high-quality quant holds a task together over that
+        # distance -- see hardware.MODELS["rewrite_thinking"]. Setting this
+        # False turns it off for every model; setting it True does not turn it
+        # on for one that cannot use it.
         "correct_improved": True,
         "correct_effort": "medium",
     },
