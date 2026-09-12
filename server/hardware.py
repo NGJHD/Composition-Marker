@@ -85,6 +85,18 @@ MODELS = [
 
 BY_KEY = {m["key"]: m for m in MODELS}
 
+# The third dropdown entry is not a model at all: it points the app at a
+# llama-server the operator is already running, and nothing is loaded here.
+# Handled as a key rather than a MODELS entry because it has no file, no size
+# and no placement -- everything in the table above is about fitting weights
+# into a card, and none of it applies.
+EXTERNAL_KEY = "port"
+DEFAULT_EXTERNAL_PORT = 9931
+
+
+def is_external(key: str) -> bool:
+    return key == EXTERNAL_KEY
+
 # Which inference backend to run. CUDA is fastest where it exists; Vulkan is
 # the cross-vendor answer -- one binary for AMD, Intel and NVIDIA, integrated
 # and discrete, needing nothing installed beyond a current display driver. CPU
@@ -367,7 +379,7 @@ def choose_key(vram_mb: int) -> str:
 
 def resolve_key(requested: str, vram_mb: int | None = None) -> str:
     """Honour an explicit choice; fall back to detection for 'auto' or junk."""
-    if requested in BY_KEY:
+    if requested in BY_KEY or is_external(requested):
         return requested
     if vram_mb is None:
         vram_mb = detect_vram_mb()
@@ -432,5 +444,15 @@ def describe(vram_mb: int) -> dict:
                 "size_gb": m["size_gb"],
             }
             for m in MODELS
+        ] + [
+            # Always selectable: there is nothing to download, and whether a
+            # server is actually listening is only knowable when a job starts.
+            {
+                "key": EXTERNAL_KEY,
+                "label": "Port: a llama-server I am already running",
+                "available": True,
+                "size_gb": 0,
+            }
         ],
+        "default_port": DEFAULT_EXTERNAL_PORT,
     }

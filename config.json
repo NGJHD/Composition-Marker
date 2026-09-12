@@ -9,17 +9,20 @@
     "threads": "auto",
     "mmproj": "mmproj-F16.gguf",
     "mmproj_offload": "auto",
-    "port": 8080,
+    "port": 8719,
     "startup_timeout_s": 240,
     "max_transcribe_tokens": 2000,
     "max_mark_tokens": 12000,
-    "max_correct_tokens": 4000
+    "max_correct_tokens": 4000,
+    "max_improved_tokens": 8000
   },
   "thinking": {
     "transcribe": false,
     "mark": true,
     "mark_effort": "medium",
-    "correct": false
+    "correct_minimal": false,
+    "correct_improved": true,
+    "correct_effort": "medium"
   },
   "images": {
     "max_edge_px": 1600,

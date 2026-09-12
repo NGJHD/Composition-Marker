@@ -1,17 +1,38 @@
-/* Composition Marker - no external assets, no CDN, no web fonts. */
+/* Composition Marker — no external assets, no CDN, no web fonts.
+ *
+ * The idea: the application is a red pen.
+ *
+ * Everything is drawn from the thing itself — foolscap ruled in pale blue, a
+ * vertical margin rule, ink, and a teacher's red. So: paper-white surfaces on
+ * a cool blue-grey ground, deep ink navy for text and for every control, and
+ * every border in the blue-grey of a ruled line. Marking red appears in
+ * exactly two places, the score and a genuine error, and nowhere else. Once it
+ * decorates anything it stops meaning "look here".
+ *
+ * Type does one job beyond being readable: the interface is set in the
+ * operating system's own face, and the documents — transcript, marking,
+ * corrections — are set in Sitka, a text serif that ships with Windows and was
+ * drawn for reading on screen. So the page tells you which parts are the tool
+ * and which parts are the work, before you have read a word of either.
+ *
+ * Light mode, desktop. The layout is untouched.
+ */
 
 :root {
-  --bg: #f6f7f9;
-  --panel: #ffffff;
-  --ink: #14171a;
-  --ink-soft: #5b6570;
-  --line: #dfe3e8;
-  --accent: #1f5fd0;
-  --accent-ink: #ffffff;
-  --danger: #b3261e;
-  --ok: #1a7f4b;
-  --radius: 10px;
-  --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+  --ground: #e9edf4;      /* the cool grey-blue of a school corridor */
+  --paper: #ffffff;
+  --paper-soft: #f7f9fc;
+  --ink: #16233a;         /* deep ink navy — not a tinted black */
+  --ink-soft: #5c6a82;
+  --ink-faint: #8593a8;
+  --rule: #cfd8e6;        /* the colour of the ruled lines themselves */
+  --rule-soft: #e3e9f2;
+  --mark: #c0102e;        /* the marking pen. Used twice. */
+  --mark-wash: #fdf2f4;
+  --radius: 4px;          /* paper is cut square; a hint of a round, no more */
+  --mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --ui: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+  --read: "Sitka Text", Sitka, Constantia, Georgia, "Times New Roman", serif;
 }
 
 * { box-sizing: border-box; }
@@ -24,55 +45,74 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--ground);
   color: var(--ink);
-  font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-        "Helvetica Neue", Arial, sans-serif;
+  font: 15px/1.55 var(--ui);
   -webkit-font-smoothing: antialiased;
 }
 
-.shell { max-width: 960px; margin: 0 auto; padding: 48px 24px 96px; }
+.shell { max-width: 960px; margin: 0 auto; padding: 44px 24px 96px; }
 
-.head { margin-bottom: 28px; }
-h1 { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 6px; }
-.sub { margin: 0; color: var(--ink-soft); font-size: 15px; }
+/* ---- masthead ---- */
+
+/* The one place the ruled-paper idea is stated outright: the title sits above
+   a rule the width of the page, the way a name sits above the first line. */
+.head { margin-bottom: 26px; padding-bottom: 18px; border-bottom: 2px solid var(--ink); }
+h1 {
+  font-family: var(--read);
+  font-size: 30px; font-weight: 600; letter-spacing: -0.015em;
+  margin: 0 0 4px;
+}
+.sub { margin: 0; color: var(--ink-soft); font-size: 14.5px; max-width: 66ch; }
 
 .panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--paper);
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
   padding: 24px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .spinner {
-  width: 16px; height: 16px; flex: none;
-  border: 2px solid var(--line);
-  border-top-color: var(--accent);
+  width: 15px; height: 15px; flex: none;
+  border: 2px solid var(--rule);
+  border-top-color: var(--ink);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+  .bar-fill { transition: none; }
+}
 
 /* ---- drop zone ---- */
 
+/* Ruled paper, literally: repeating-linear-gradient draws the lines, and the
+   dashed border is the edge of the sheet. It is the only illustrative moment
+   in the interface and it is doing a job — saying "put pages here" without a
+   word or an icon. */
 .drop {
-  border: 2px dashed var(--line);
+  border: 1px dashed var(--rule);
   border-radius: var(--radius);
   padding: 40px 24px;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-  background: #fbfcfd;
+  transition: border-color 0.15s, background-color 0.15s;
+  background-color: var(--paper-soft);
+  background-image: repeating-linear-gradient(
+    to bottom, transparent 0 27px, var(--rule) 27px 28px);
+  background-position: 0 6px;
 }
-.drop:hover, .drop:focus-visible { border-color: var(--accent); background: #f4f8ff; outline: none; }
-.drop.over { border-color: var(--accent); background: #eaf1fe; }
-.drop-title { font-size: 17px; font-weight: 600; }
-.drop-hint { color: var(--ink-soft); font-size: 14px; margin-top: 4px; }
+.drop:hover, .drop:focus-visible { border-color: var(--ink-soft); background-color: #f2f6fc; outline: none; }
+.drop:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.drop.over { border-color: var(--ink); background-color: #eaf0f9; }
+.drop-title { font-family: var(--read); font-size: 18px; font-weight: 600; }
+.drop-hint { color: var(--ink-soft); font-size: 13.5px; margin-top: 5px; }
 
 /* ---- the page strip ---- */
 
-.pages { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.pages { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--rule-soft); }
 .pages-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
 .pages-count { font-weight: 600; font-size: 14px; }
 .pages-head .btn { margin-left: auto; }
@@ -83,82 +123,93 @@ h1 { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 6px
 }
 .thumb {
   position: relative; width: 132px;
-  border: 1px solid var(--line); border-radius: 8px;
-  background: #fff; padding: 8px; cursor: grab;
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  background: var(--paper); padding: 7px; cursor: grab;
 }
 .thumb.dragging { opacity: 0.4; }
-.thumb.dropbefore { border-left: 3px solid var(--accent); }
+.thumb.dropbefore { box-shadow: inset 3px 0 0 var(--ink); }
 .thumb img {
   display: block; width: 100%; height: 150px;
-  object-fit: cover; border-radius: 5px; background: #eceff3;
+  object-fit: cover; border-radius: 2px; background: var(--ground);
+  cursor: zoom-in;
 }
 .thumb-bar { display: flex; align-items: center; gap: 4px; margin-top: 7px; }
 .thumb-no {
-  font: 12px var(--mono); font-weight: 700; color: var(--accent);
-  min-width: 20px;
+  font: 600 13px/1 var(--read);
+  color: var(--ink); min-width: 18px;
 }
 .thumb-btn {
   font: inherit; font-size: 13px; line-height: 1;
   width: 24px; height: 24px; padding: 0;
-  border: 1px solid var(--line); border-radius: 6px;
-  background: #fff; color: var(--ink-soft); cursor: pointer;
+  border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--paper); color: var(--ink-soft); cursor: pointer;
 }
-.thumb-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.thumb-btn:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
 .thumb-btn:disabled { opacity: 0.3; cursor: default; }
-.thumb-btn.del { margin-left: auto; color: var(--danger); }
-.thumb-note { font-size: 11.5px; color: var(--ink-soft); margin-top: 4px; }
+.thumb-btn.del { margin-left: auto; color: var(--mark); }
+.thumb-btn.del:hover { border-color: var(--mark); background: var(--mark-wash); }
+.thumb-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 4px; }
 
 /* ---- controls ---- */
 
 .controls { display: flex; align-items: flex-end; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field.grow { flex: 1 1 240px; }
-.field-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
-.opt { text-transform: none; letter-spacing: 0; font-style: italic; opacity: 0.8; }
+/* Sentence case, not tracked-out capitals: these are labels on a form, and
+   shouting them adds nothing a reader needs. */
+.field-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.opt { font-weight: 400; font-style: italic; color: var(--ink-faint); }
 
-select, .btn, input[type="text"] {
+select, .btn, input[type="text"], input[type="number"] {
   font: inherit;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--rule);
+  background: var(--paper);
   color: var(--ink);
-  padding: 9px 14px;
+  padding: 8px 12px;
 }
 select, .btn { cursor: pointer; }
 select { min-width: 150px; }
 input[type="text"] { width: 100%; }
-input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-.btn:hover:not(:disabled) { border-color: #b9c0c9; }
-.btn:disabled { opacity: 0.45; cursor: default; }
+input[type="number"] { width: 110px; font-variant-numeric: tabular-nums; }
+input:focus, select:focus, .btn:focus-visible {
+  outline: 2px solid var(--ink); outline-offset: 1px; border-color: var(--ink);
+}
+.btn:hover:not(:disabled) { border-color: var(--ink-soft); background: var(--paper-soft); }
+.btn:disabled { opacity: 0.42; cursor: default; }
 
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; margin-left: auto; }
-.btn.primary:hover:not(:disabled) { background: #1a53b8; }
-.btn.danger { color: var(--danger); border-color: #e6c9c7; }
-.btn.danger:hover { background: #fdf3f2; }
-.btn.small { padding: 6px 11px; font-size: 13px; }
+/* The primary action is ink, not red. Red is the marking. */
+.btn.primary {
+  background: var(--ink); border-color: var(--ink); color: #fff;
+  font-weight: 600; margin-left: auto; padding: 8px 20px;
+}
+.btn.primary:hover:not(:disabled) { background: #0d1728; border-color: #0d1728; }
+.btn.danger { color: var(--mark); border-color: #e8c2ca; }
+.btn.danger:hover { background: var(--mark-wash); border-color: var(--mark); }
+.btn.small { padding: 5px 10px; font-size: 13px; }
 .btn.ghost { background: none; border-color: transparent; color: var(--ink-soft); }
-.btn.ghost:hover { border-color: var(--line); background: #fff; color: var(--ink); }
+.btn.ghost:hover { border-color: var(--rule); background: var(--paper); color: var(--ink); }
 
 #model { min-width: 300px; }
-.model-note { margin: 12px 0 0; color: var(--ink-soft); font-size: 13px; }
+.model-note { margin: 12px 0 0; color: var(--ink-soft); font-size: 13px; max-width: 74ch; }
 
 /* ---- progress ---- */
 
 .prog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-.stage { font-size: 17px; font-weight: 600; }
-.stage-msg { color: var(--ink-soft); font-size: 14px; margin-top: 2px; }
+.stage { font-family: var(--read); font-size: 19px; font-weight: 600; }
+.stage-msg { color: var(--ink-soft); font-size: 13.5px; margin-top: 3px; font-variant-numeric: tabular-nums; }
 .prog-right { text-align: right; }
-.pct { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.pct { font-family: var(--read); font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .elapsed { color: var(--ink-soft); font-size: 13px; font-variant-numeric: tabular-nums; }
-.remaining { color: var(--ink-soft); font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.remaining { color: var(--ink-faint); font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 2px; }
 
-.bar { height: 8px; background: #eceff3; border-radius: 999px; overflow: hidden; margin: 18px 0; }
-.bar-fill { height: 100%; width: 0; background: var(--accent); border-radius: 999px; transition: width 0.4s ease; }
+.bar { height: 6px; background: var(--ground); border-radius: 999px; overflow: hidden; margin: 18px 0; }
+.bar-fill { height: 100%; width: 0; background: var(--ink); border-radius: 999px; transition: width 0.4s ease; }
 
 .log {
   height: 190px; overflow-y: auto;
-  background: #0f1319; color: #c8d2dd;
-  border-radius: 8px; padding: 12px 14px;
+  background: #101a2c; color: #b9c6da;
+  border-radius: var(--radius); padding: 12px 14px;
   font: 12.5px/1.65 var(--mono);
   white-space: pre-wrap; word-break: break-word;
 }
@@ -168,61 +219,87 @@ input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); outli
 .result-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
 .result-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
-.score-block { display: flex; align-items: baseline; gap: 12px; }
+/* The one loud thing on the page, and the reason the rest is quiet. */
+.score-block { display: flex; align-items: baseline; gap: 14px; }
 .score {
-  font-size: 34px; font-weight: 700; letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums; color: var(--accent);
+  font-family: var(--read);
+  font-size: 42px; font-weight: 600; letter-spacing: -0.02em; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--mark);
 }
-.score-sub { color: var(--ink-soft); font-size: 14px; }
+.score-sub { color: var(--ink-soft); font-size: 13.5px; }
 
 .build {
   display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
-  padding: 16px 0 16px; border-bottom: 1px solid var(--line);
-  margin-top: 16px;
+  padding: 18px 0; border-top: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  margin-top: 18px;
 }
-.build-label {
-  font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--ink-soft);
-}
-.build-note { color: var(--ink-soft); font-size: 12.5px; flex: 1 1 200px; }
+.build-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.build-note { color: var(--ink-faint); font-size: 12.5px; flex: 1 1 200px; }
 #correction { min-width: 290px; }
 
-.tabs { display: flex; gap: 6px; margin: 18px 0 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tabs { display: flex; gap: 2px; margin: 18px 0 0; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
 .tab {
   font: inherit; font-size: 14px; background: none; border: none; cursor: pointer;
-  padding: 9px 14px; color: var(--ink-soft); border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: 9px 15px; color: var(--ink-soft);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
 }
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tab:hover { color: var(--ink); }
+.tab.active { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
 
-.doc { margin-top: 20px; max-height: 660px; overflow-y: auto; }
-.doc h1 { font-size: 22px; }
-.doc h2 { font-size: 17px; margin: 26px 0 8px; padding-bottom: 5px; border-bottom: 1px solid var(--line); }
+/* ---- the documents ---- */
+
+/* Everything below reads as paper: serif, generous leading, a measure that
+   stops well short of the full width. */
+.doc {
+  margin-top: 22px; max-height: 660px; overflow-y: auto;
+  font-family: var(--read);
+  padding-right: 6px;
+}
+.doc h1 { font-size: 23px; font-weight: 600; letter-spacing: 0; margin: 0 0 14px; }
+.doc h2 {
+  font-size: 16px; font-weight: 600; margin: 28px 0 10px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--rule-soft);
+}
 .doc h3 { font-size: 15px; margin: 18px 0 6px; }
-.doc p, .doc li { font-size: 15px; }
-.doc ul { padding-left: 22px; }
-.doc code { font: 13px var(--mono); background: #eef1f5; padding: 1px 5px; border-radius: 4px; }
+.doc p, .doc li { font-size: 15.5px; line-height: 1.65; max-width: 72ch; }
+.doc ul { padding-left: 20px; }
+.doc li { margin-bottom: 5px; }
+.doc strong { font-weight: 600; }
+.doc code { font: 13px var(--mono); background: var(--ground); padding: 1px 5px; border-radius: 3px; }
 .doc em { color: var(--ink-soft); }
-.doc hr { border: none; border-top: 1px solid var(--line); margin: 20px 0; }
+.doc hr { border: none; border-top: 1px solid var(--rule-soft); margin: 22px 0; }
 
-/* The composition itself, on the transcript and correction tabs: read as
-   prose, not as a marked-up document. */
-.doc .composition { white-space: pre-wrap; font-size: 15.5px; line-height: 1.75; }
+/* The composition itself, on the transcript and correction tabs. A margin rule
+   down the left, the way it runs down a sheet of foolscap — this is the
+   child's page, not the report about it. */
+.doc .composition {
+  white-space: pre-wrap;
+  font-size: 16px; line-height: 1.85;
+  max-width: 70ch;
+  margin-top: 18px;
+  padding-left: 20px;
+  border-left: 1px solid var(--rule);
+}
 
 /* ---- tables ---- */
 
 /* The sentence-improvement table has three long columns and will not fit on a
    narrow window. It scrolls inside its own box: the page body must never
    scroll sideways. */
-.tablewrap { overflow-x: auto; margin: 14px 0; }
+.tablewrap { overflow-x: auto; margin: 16px 0; }
 .doc table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
 .doc th, .doc td {
-  border: 1px solid var(--line); padding: 7px 10px;
-  text-align: left; vertical-align: top; line-height: 1.5;
+  border: 1px solid var(--rule-soft); padding: 8px 11px;
+  text-align: left; vertical-align: top; line-height: 1.55;
 }
-.doc th { background: #f5f7fa; font-weight: 600; white-space: nowrap; }
-/* Deliberately NOT nowrap on the first column: unlike the meeting app's
-   speaker tables, column one here is a row number and columns two and three
-   are whole sentences that must be free to wrap. */
+.doc th {
+  background: var(--paper-soft); font-weight: 600; white-space: nowrap;
+  font-family: var(--ui); font-size: 12.5px; color: var(--ink-soft);
+  border-bottom-color: var(--rule);
+}
+/* Deliberately NOT nowrap on the first column: column one here is a row number
+   and columns two and three are whole sentences that must be free to wrap. */
 
 /* The criteria table is the exception. Its first three columns are a label, a
    mark and a band number, none of which should ever wrap -- "26 / 40" split
@@ -230,66 +307,75 @@ input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); outli
 .doc table.marks td:nth-child(-n+3),
 .doc table.marks th:nth-child(-n+3) { white-space: nowrap; width: 1%; }
 .doc table.marks td:nth-child(4) { width: auto; }
+/* The mark itself in the marking pen's colour, and set in the reading face so
+   it lines up with the score above it. */
+.doc table.marks td:nth-child(2) {
+  font-weight: 600; color: var(--mark); font-variant-numeric: tabular-nums;
+}
 
 /* ---- errors, hints, notes ---- */
 
-.error, .fail-msg { color: var(--danger); }
+.error, .fail-msg { color: var(--mark); }
 .error { margin: 16px 0 0; font-size: 14px; }
-.fail-title { margin: 0 0 8px; font-size: 20px; }
+.fail-title { font-family: var(--read); margin: 0 0 8px; font-size: 21px; }
 .fail-msg { margin: 0; font-size: 15px; white-space: pre-wrap; }
-.hint { margin: 12px 0 0; color: var(--ink-soft); font-size: 13.5px; }
+.hint { margin: 12px 0 0; color: var(--ink-faint); font-size: 13px; max-width: 74ch; }
 
 /* ---- startup ---- */
 
 .boot-head { display: flex; align-items: center; gap: 12px; }
-.boot-title { font-size: 17px; font-weight: 600; }
-.boot-elapsed { margin-left: auto; color: var(--ink-soft); font-size: 13px; font-variant-numeric: tabular-nums; }
+.boot-title { font-family: var(--read); font-size: 18px; font-weight: 600; }
+.boot-elapsed { margin-left: auto; color: var(--ink-faint); font-size: 13px; font-variant-numeric: tabular-nums; }
 .boot-msg { margin: 14px 0 0; color: var(--ink-soft); font-size: 14px; }
 .boot-detail {
-  margin: 8px 0 0; font-size: 14px; color: var(--ink);
-  background: #fff8e6; border: 1px solid #f0dfae; border-radius: 8px; padding: 10px 14px;
+  margin: 10px 0 0; font-size: 14px; color: var(--ink);
+  background: var(--paper-soft); border: 1px solid var(--rule);
+  border-left: 3px solid var(--ink-soft);
+  border-radius: var(--radius); padding: 11px 14px; max-width: 74ch;
 }
 
 /* ---- tooltip ---- */
 
 .tip {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 15px; height: 15px; margin-left: 5px; border-radius: 50%;
-  border: 1px solid var(--line); background: #fff; color: var(--ink-soft);
+  width: 16px; height: 16px; margin-left: 6px; border-radius: 50%;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink-soft);
   font-size: 10px; font-weight: 700; cursor: help; position: relative;
-  text-transform: none; letter-spacing: 0;
 }
-.tip:hover, .tip:focus { border-color: var(--accent); color: var(--accent); outline: none; }
+.tip:hover, .tip:focus { border-color: var(--ink); color: var(--ink); outline: none; }
 .tip::after {
   content: attr(data-tip);
   position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
-  width: 280px; padding: 9px 11px; border-radius: 8px;
-  background: #14171a; color: #f2f5f8; font-size: 12.5px; font-weight: 400;
-  line-height: 1.45; text-align: left; letter-spacing: 0;
+  width: 280px; padding: 10px 12px; border-radius: var(--radius);
+  background: var(--ink); color: #eef2f8; font-size: 12.5px; font-weight: 400;
+  line-height: 1.5; text-align: left;
   opacity: 0; visibility: hidden; transition: opacity 0.12s; z-index: 10;
 }
 .tip:hover::after, .tip:focus::after { opacity: 1; visibility: visible; }
 
 /* ---- history ---- */
 
+/* Quieter than the working panels on purpose: this is a shelf you glance at,
+   not a surface you act on. Rows are rules on a page rather than cards. */
 .hist-head { display: flex; align-items: baseline; gap: 12px; }
-.hist-title { margin: 0; font-size: 16px; font-weight: 600; }
+.hist-title { font-family: var(--read); margin: 0; font-size: 18px; font-weight: 600; }
 .hist-head .btn { margin-left: auto; }
-.hist-sub { margin: 6px 0 14px; color: var(--ink-soft); font-size: 13.5px; }
+.hist-sub { margin: 6px 0 12px; color: var(--ink-faint); font-size: 13px; }
 .hist-row {
   display: flex; align-items: baseline; gap: 14px; width: 100%;
-  padding: 11px 14px; margin-bottom: 8px; text-align: left; cursor: pointer;
-  border: 1px solid var(--line); border-radius: var(--radius);
-  background: #fff; font: inherit; color: inherit;
+  padding: 11px 12px; text-align: left; cursor: pointer;
+  border: none; border-bottom: 1px solid var(--rule-soft); border-radius: 0;
+  background: none; font: inherit; color: inherit;
 }
-.hist-row:hover:not(:disabled) { border-color: var(--accent); background: #f7faff; }
+.hist-row:hover:not(:disabled) { background: var(--paper-soft); box-shadow: inset 3px 0 0 var(--ink); }
+.hist-row:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .hist-row:disabled { opacity: 0.5; cursor: default; }
-.hist-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hist-meta { margin-left: auto; flex: none; color: var(--ink-soft); font-size: 12.5px; }
+.hist-name { font-family: var(--read); font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-meta { margin-left: auto; flex: none; color: var(--ink-faint); font-size: 12.5px; }
 
 /* ---- "Mark another" sits below everything the finished page shows ---- */
 
-.panel.plain { background: none; border: none; padding: 4px 0 0; text-align: center; }
+.panel.plain { background: none; border: none; padding: 6px 0 0; text-align: center; }
 #another .btn { min-width: 260px; }
 
 /* ---- About overlay ---- */
@@ -301,48 +387,48 @@ input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); outli
 .overlay {
   position: fixed; inset: 0; z-index: 40;
   display: flex; align-items: center; justify-content: center;
-  padding: 24px; background: rgba(20, 23, 26, 0.42);
+  padding: 24px; background: rgba(22, 35, 58, 0.45);
 }
 .sheet {
-  width: 100%; max-width: 460px; background: #fff;
-  border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 20px 22px 18px; box-shadow: 0 18px 48px rgba(20, 23, 26, 0.22);
+  width: 100%; max-width: 460px; background: var(--paper);
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  padding: 22px 24px 20px; box-shadow: 0 20px 50px rgba(22, 35, 58, 0.25);
 }
-.sheet-head { display: flex; align-items: center; margin-bottom: 14px; }
-.sheet-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.sheet-head { display: flex; align-items: center; margin-bottom: 16px; }
+.sheet-head h2 { font-family: var(--read); margin: 0; font-size: 18px; font-weight: 600; }
 .iconbtn {
   margin-left: auto; width: 28px; height: 28px; line-height: 1;
-  border: 1px solid transparent; border-radius: 6px; background: none;
+  border: 1px solid transparent; border-radius: 3px; background: none;
   font-size: 20px; color: var(--ink-soft); cursor: pointer;
 }
-.iconbtn:hover { border-color: var(--line); color: var(--ink); }
+.iconbtn:hover { border-color: var(--rule); color: var(--ink); }
 
 .about-grid {
-  display: grid; grid-template-columns: auto 1fr; gap: 8px 18px;
+  display: grid; grid-template-columns: auto 1fr; gap: 9px 20px;
   margin: 0 0 18px; font-size: 14px;
 }
-.about-grid dt { color: var(--ink-soft); }
+.about-grid dt { color: var(--ink-faint); }
 .about-grid dd { margin: 0; overflow-wrap: anywhere; }
-.about-grid a { color: var(--accent); }
+.about-grid a { color: var(--ink); text-underline-offset: 2px; }
 .about-note {
-  margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line);
-  font-size: 12.5px; color: var(--ink-soft); line-height: 1.5;
+  margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--rule-soft);
+  font-size: 12.5px; color: var(--ink-faint); line-height: 1.55;
 }
 
 /* ---- full-size page viewer ---- */
 
 /* Darker than the About sheet's backdrop: this is for reading handwriting, so
    everything except the page should get out of the way. */
-#viewer { background: rgba(12, 14, 17, 0.88); padding: 16px; }
+#viewer { background: rgba(8, 14, 24, 0.9); padding: 16px; }
 .viewer-inner {
   display: flex; flex-direction: column; gap: 10px;
   max-width: 100%; max-height: 100%;
 }
 .viewer-bar { display: flex; align-items: center; gap: 10px; }
-.viewer-title { color: #f2f5f8; font-size: 14px; font-weight: 600; margin-right: auto; }
-.viewer-bar .btn { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.25); color: #f2f5f8; }
+.viewer-title { color: #eef2f8; font-size: 14px; font-weight: 600; margin-right: auto; }
+.viewer-bar .btn { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.25); color: #eef2f8; }
 .viewer-bar .btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.45); }
-.viewer-bar .iconbtn { color: #f2f5f8; margin-left: 0; }
+.viewer-bar .iconbtn { color: #eef2f8; margin-left: 0; }
 .viewer-bar .iconbtn:hover { border-color: rgba(255, 255, 255, 0.45); color: #fff; }
 
 /* The point of the overlay is to see the page as large as it will go, so it
@@ -351,6 +437,5 @@ input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); outli
   display: block; min-height: 0;
   max-width: 100%; max-height: calc(100vh - 76px);
   object-fit: contain;
-  border-radius: 6px; background: #fff;
+  border-radius: 2px; background: #fff;
 }
-.thumb img { cursor: zoom-in; }

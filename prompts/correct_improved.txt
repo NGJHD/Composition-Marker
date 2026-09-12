@@ -1,52 +1,78 @@
-Rewrite this child's composition so it is better written, keeping the same
-story.
+Rewrite this child's composition from scratch, as a model answer.
 
-There is already a separate document that is this composition with its mistakes
-fixed and nothing else changed. Yours is not that document. If you hand the
-composition back with only its errors corrected, you have failed the task.
+This is not a correction. A separate document already exists that is the same
+composition with its mistakes fixed and nothing else changed. Yours is a
+different thing entirely: the same story, told properly.
 
-YOU MUST MAKE ALL SIX OF THESE CHANGES
+THE TEST YOU MUST PASS
 
-1. Rewrite the FIRST sentence so it pulls the reader in harder than the
-   original did.
-2. Rewrite the LAST sentence so the piece closes instead of stopping.
-3. Add at least TWO new sentences of detail -- what something looked like,
-   sounded like, or how it felt in the body. Put them where the writing is
-   thinnest.
-4. Replace at least THREE flat verbs with stronger, more exact ones.
-5. Change at least THREE sentence openers so they are not all the same shape.
-6. Fix every spelling, grammar, tense and punctuation mistake as you go.
+Put your version beside the original. If a reader could match up your sentences
+with the child's one for one -- same sentence, same order, better words -- you
+have written the wrong document. That is the corrected version, and it already
+exists.
 
-Do not skip any of the six. Go through them one at a time.
+What you are writing should read as though a stronger writer was given the same
+story to tell and told it their own way. Different sentences. Different
+details. Different moments chosen to dwell on. The same events happening in the
+same order, to the same people, ending the same way.
 
-WHAT STAYS
+Before you write, decide two things: which moment of this story deserves the
+most room, and what the original rushed past that is worth inventing. Then
+write it.
 
-- The same events, characters and ending. This is the same composition.
+WHAT YOU MUST KEEP
+
+- The topic.
+- The broad strokes of the plot: the same situation, the same main events in
+  the same order, the same outcome. A reader who knows the original must
+  recognise this as the same story.
 - The title, as the first line, if there is one.
-- Every good word the child already used. If they wrote "famished" or
-  "lustrous", keep it -- you are adding to their writing, never simplifying it.
-- The length, or a little more. Never shorter.
 
-{{IMPROVEMENTS}}
+WHAT YOU ARE FREE TO CHANGE
 
-{{SHARED_RULES}}
+Everything else. This is a reimagining, not a polish.
 
-{{LEVEL_BLOCK}}
+- Invent new details, descriptions and small moments wherever they make the
+  piece better. Replace the child's details entirely if yours serve the story
+  more.
+- Add a storyline, a complication or a character if it makes the plot flow --
+  as long as the broad strokes above still hold.
+- Rewrite every sentence. None of the child's sentences need survive.
+- Cut what does not earn its place.
+
+THE STANDARD TO WRITE TO
+
+{{TARGET_BLOCK}}
+
+Write at that standard and no higher. The child is one level below it, and the
+whole purpose is to show them the next step -- something they could reach
+within a year, not something out of sight. Do not write like an adult novelist
+for a primary school child.
+
+LENGTH -- THIS IS A HARD LIMIT
+
+The original is {{ORIGINAL_WORDS}}. Your version must be **no longer than
+{{MAX_WORDS}}**. That is the ceiling, not the target. Aim for about the same
+length as the original.
+
+You are being asked to write something better in the same number of words, not
+something longer. If you are running out of room, cut a weaker passage rather
+than letting the piece run over.
+
+PARAGRAPHS
+
+Break the piece into paragraphs, with a BLANK LINE between each one. A new
+paragraph at each change of time, place, speaker or idea. A wall of unbroken
+text is a failure however well written it is -- the child is being shown what
+good work looks like on the page as well as in the words.
 
 {{TOPIC_BLOCK}}
 
-The level tells you where to aim, and it is a floor, not a ceiling. Where the
-composition is weaker than the level, lift it to the level. Where it is already
-stronger than the level, the child's own writing is the standard and you match
-it. Never write down to the level -- a Primary 3 story must not come back as
-Secondary 3 prose, but a strong composition must not come back plainer than it
-went in either.
-
 {{LANGUAGE_INSTRUCTION}}
 
-Reply with the improved composition and nothing else. No heading, no notes, no
-list of what you changed.
+Reply with the composition and nothing else. No heading, no notes, no word
+count, no explanation of what you changed.
 
-THE COMPOSITION
+THE ORIGINAL COMPOSITION
 
 {{COMPOSITION}}

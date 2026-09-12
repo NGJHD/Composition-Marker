@@ -411,20 +411,25 @@ Band 1  (0-39)    Well below the level, or the task was not attempted.
 
 def marks_table(language: str = "en") -> str:
     """The criteria and their weights, as the prompt states them."""
+    # Organisation deliberately does NOT mention paragraphing. The transcript
+    # cannot preserve it -- this child indents rather than leaving a blank line
+    # and the indent is lost in the reading -- so a criterion that named it
+    # would have the model deducting for work it simply cannot see.
     if language == "zh":
         return (
             "内容 Content 40分：切题、内容充实、有中心思想、详略得当。\n"
             "语文 Language 40分：用词准确、语句通顺、标点与错别字、"
             "描写与修辞是否恰当。\n"
-            "组织 Organisation 20分：开头与结尾、段落安排、条理与过渡。"
+            "组织 Organisation 20分：开头与结尾、条理是否清楚、"
+            "情节先后顺序、前后是否连贯。"
         )
     return (
         "Content 40 marks: relevance to the topic, interest and development of "
         "ideas, and whether the piece does what it set out to do.\n"
         "Language 40 marks: grammar, tense, spelling, punctuation, vocabulary "
         "and sentence variety.\n"
-        "Organisation 20 marks: opening and ending, paragraphing, sequencing "
-        "and the links between ideas."
+        "Organisation 20 marks: the opening and the ending, the order events "
+        "are told in, and whether each idea leads to the next."
     )
 
 
@@ -470,6 +475,62 @@ def label(level_key: str) -> str:
 def age(level_key: str) -> int:
     level = BY_KEY.get(level_key)
     return level["age"] if level else 0
+
+
+# Where the improved rewrite aims: one level above the child's own.
+#
+# The point is to show the way ahead -- a model answer at the child's own level
+# shows them what they nearly managed, while one level up shows them what they
+# are working towards and is still close enough to learn from.
+#
+# Secondary 5 is skipped on the way up: it is the N-level year, a different
+# route rather than a step beyond Secondary 4, so Secondary 4 aims at JC1 and
+# Secondary 5 does too. JC2 has nothing above it in school, so it aims at a
+# capable adult writing for a general reader.
+NEXT_LEVEL = {
+    "p1": "p2", "p2": "p3", "p3": "p4", "p4": "p5", "p5": "p6",
+    "p6": "s1", "s1": "s2", "s2": "s3", "s3": "s4",
+    "s4": "jc1", "s5": "jc1", "jc1": "jc2", "jc2": "adult",
+}
+
+ADULT_LABEL = "an educated adult writing for a general reader"
+
+ADULT_EXPECTATION = {
+    "en": (
+        "Target standard: %s -- beyond school level.\n"
+        "What that means here: an argument or a narrative that holds together "
+        "from first line to last, specific and concrete rather than general, "
+        "with sentence rhythm varied on purpose, no padding, and a close that "
+        "lands. Precise vocabulary used accurately; nothing reached for."
+    ) % ADULT_LABEL,
+    "zh": (
+        "目标水平：成人写作水平，已超出中学与初级学院的范围。\n"
+        "具体而言：结构完整、前后呼应，论述或叙述具体而不空泛，"
+        "句式有意变化，没有废话，结尾有力。用词准确、自然，不堆砌辞藻。"
+    ),
+}
+
+
+def target_block(level_key: str, language: str = "en") -> str:
+    """The standard the improved rewrite should be written to.
+
+    One level above the composition's own. Returns the same shape of block as
+    expectations_block so the rewrite prompt reads consistently, with a line
+    saying plainly which level it is aiming at and why.
+    """
+    target = NEXT_LEVEL.get(level_key, level_key)
+    if target == "adult":
+        return ADULT_EXPECTATION.get(language, ADULT_EXPECTATION["en"])
+    block = expectations_block(target, language)
+    if language == "zh":
+        return ("这是改写的目标水平，比学生目前的年级高一级：\n\n%s" % block)
+    return ("This is the standard to write the improved version to. It is one "
+            "level ABOVE the child's own, deliberately:\n\n%s" % block)
+
+
+def target_label(level_key: str) -> str:
+    target = NEXT_LEVEL.get(level_key, level_key)
+    return ADULT_LABEL if target == "adult" else (label(target) or "")
 
 
 def choices() -> list:

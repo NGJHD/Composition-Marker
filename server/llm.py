@@ -93,10 +93,17 @@ class LlamaServer:
     """Owns the llama-server process for the life of one job."""
 
     def __init__(self, job: Job, cfg: dict):
+        from . import hardware
+
         self.job = job
         self.cfg = cfg
         self.llm = cfg["llm"]
-        self.port = int(self.llm.get("port", 8080))
+        # "Port" in the model dropdown means the operator is running their own
+        # llama-server and we are a client of it: nothing is loaded, nothing is
+        # shut down afterwards, and the port is theirs rather than ours.
+        self.external = hardware.is_external(job.model_key)
+        self.port = (int(job.external_port or hardware.DEFAULT_EXTERNAL_PORT)
+                     if self.external else int(self.llm.get("port", 8719)))
         self.proc: Optional[subprocess.Popen] = None
         self._conn: Optional[HTTPConnection] = None
         self._conn_lock = threading.Lock()
@@ -204,6 +211,8 @@ class LlamaServer:
         return cmd
 
     def start(self) -> None:
+        if self.external:
+            return self._attach()
         model, _layers, _regex = self.resolve_model()
         if not model.exists():
             raise JobError(LLM_FAILED, "model file missing: %s" % model)
@@ -251,6 +260,28 @@ class LlamaServer:
             % (timeout, self._log_tail()),
         )
 
+    def _attach(self) -> None:
+        """Use a llama-server somebody else started, on 127.0.0.1:<port>.
+
+        No model is loaded and no process is spawned, so the only thing that
+        can be checked is whether something is answering. Whether it has a
+        vision projector is deliberately not probed: the operator chose this
+        option and knows what they are running, and a server without one will
+        answer about a page it never saw -- which shows up as a nonsense
+        transcript on the Transcript tab rather than as a silent wrong mark.
+        """
+        self.job.log("llm: using the llama-server already running on port %d"
+                     % self.port)
+        if self._healthy():
+            self.job.log("llm: connected")
+            return
+        raise JobError(
+            "Nothing is answering on port %d. Start your llama-server first, "
+            "or choose High or Low Quality to use the built-in model."
+            % self.port,
+            "no response from http://127.0.0.1:%d/health" % self.port,
+        )
+
     def _log_tail(self, lines: int = 40) -> str:
         try:
             with open(config.TEMP / "llama-server.log", "r",
@@ -273,6 +304,8 @@ class LlamaServer:
     def stop(self) -> None:
         """Shut the server down. 16 GB of VRAM must not stay allocated."""
         self.abort()
+        if self.external:
+            return          # not ours to stop
         proc, self.proc = self.proc, None
         if proc is None:
             return

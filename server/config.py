@@ -179,7 +179,12 @@ _DEFAULTS = {
         # the image encoder, not part of the language weights.
         "mmproj": "mmproj-F16.gguf",
         "mmproj_offload": "auto",
-        "port": 8080,
+        # NOT 8080. That is llama.cpp's own default, so it is exactly the port
+        # an operator's own llama-server will be sitting on -- and the Port
+        # option in the model dropdown exists to talk to one of those. Two
+        # servers fighting over 8080 is a confusing failure; a number nobody
+        # else claims costs nothing.
+        "port": 8719,
         "startup_timeout_s": 240,
         "max_transcribe_tokens": 2000,
         # These caps cover EVERYTHING the model generates, reasoning included.
@@ -198,6 +203,9 @@ _DEFAULTS = {
         # between a whole report and half a table.
         "max_mark_tokens": 12000,
         "max_correct_tokens": 4000,
+        # The improved rewrite runs with thinking on and writes a whole
+        # composition, so it needs room for both.
+        "max_improved_tokens": 8000,
     },
     "thinking": {
         # Transcription is mechanical: reasoning about handwriting produces
@@ -206,7 +214,14 @@ _DEFAULTS = {
         "transcribe": False,
         "mark": True,
         "mark_effort": "medium",
-        "correct": False,
+        # The two corrections are opposite jobs. The minimal one finds errors
+        # and fixes them; reasoning buys it nothing. The improved one has to
+        # reimagine the composition while holding the plot, a target level one
+        # step above the child's, a hard word ceiling and a paragraph structure
+        # all at once -- it cannot do that without thinking.
+        "correct_minimal": False,
+        "correct_improved": True,
+        "correct_effort": "medium",
     },
     "images": {
         # What the browser downscales to before uploading. 1600px on the long
@@ -343,6 +358,11 @@ def missing_files() -> list[Path]:
     if not mmproj_path().exists():
         missing.append(mmproj_path())
     try:
+        # Someone using their own llama-server on a port needs none of our
+        # weights, and should not be held at the door by a health check
+        # demanding 24 GB of downloads they will never load.
+        if str(load_preferences().get("model") or "") == hardware.EXTERNAL_KEY:
+            return missing
         requested = load_config()["llm"]["model"]
         if requested in ("auto", "", None):
             # Both ship, and the UI lets the user pick either, so both must be

@@ -711,6 +711,81 @@ of them needs a model download; 5 and 6 need a phone.
 
 ---
 
+## 8a. Paragraph indentation cannot be recovered from these models
+
+The most interesting negative result in this file.
+
+Singapore school compositions mark a new paragraph by **indenting the first
+line**. There is no blank line — ruled paper has none to spare. Every transcript
+was therefore coming back as one unbroken block, which is wrong twice over:
+Organisation is 20 of the 100 marks and paragraphing is most of it, and the
+corrected versions inherit the shape.
+
+Four approaches, on the operator's own photographed pages:
+
+| Asked for | IQ2_XXS | Q4_K_M |
+|---|---|---|
+| "put a blank line before an indented line" | one block | one block |
+| "write `[P]` before each indented line" | no markers at all | **no markers at all** |
+| "one ruled line per output line, four spaces for an indent" | **`NO_TEXT_FOUND`** — gave up entirely | not reached |
+| nothing about paragraphs | one block | one block |
+
+The `[P]` row is the decisive one. It is not a quantisation limit: the high
+quality model fails it identically. The vision path reads the *words* on a line
+and does not attend to where the line starts. Asking it to do so in the same
+call as the transcription makes the low model abandon the page.
+
+The code side is in place and costs nothing — `_apply_para_marks` honours both
+`[P]` markers and genuine leading indentation, so a model that ever reports
+either will get paragraphs — but **no model shipped here reports either**, and
+more prompt engineering is not going to change that.
+
+The real fix, if it is wanted, is to stop asking: the browser already draws
+every page to a canvas to resize it, so it could find the leftmost dark pixel
+per text row, detect which rows start further in, and send the paragraph
+positions along with the image. That is deterministic pixel measurement rather
+than a model judgement, it needs no new Python dependency, and it is the only
+approach here that does not depend on the model noticing something it has
+demonstrated twice that it does not notice.
+
+## 8b. Two failures the red-ink instruction introduced
+
+Asked to ignore the teacher's red marking, IQ2_XXS did something new and bad:
+it transcribed the page correctly to the end, emitted a hallucinated closing
+tag, and then continued in the document channel —
+
+> `</washed>` Wait, I need to re-examine the image. The text is written in a
+> cursive hand. Let's look at the red ink. Line 1: … Line 2: …
+
+— before locking into repeating one sentence until the token cap. Thinking is
+off for this call, so there is no reasoning channel and all of it lands in the
+transcript. A second run opened with *"The image is rotated 90 degrees
+clockwise"*, which is both a preamble and a hallucination.
+
+Three fixes, all code-side, because a prompt that says "do not write a preamble"
+was already there and was being ignored:
+
+- `_trim_deliberation` cuts the page at the first deliberation marker and logs
+  that it did. Everything before it is a good transcript, so the page is kept
+  rather than thrown away.
+- `_repetition_start` truncates at three identical sentences in a row.
+- The preamble stripper was widened from "here is the text:" to any short
+  opening line that ends in a colon and talks about the image rather than
+  being in it.
+
+And the prompt was cut back hard — it had grown to four times its original
+length with rules added one at a time, and length alone is what a 2-bit model
+cannot hold. After the trim, no leaks, no preamble, no repetition.
+
+**On red ink itself the result is partial and the operator has been told so.**
+Q4_K_M ignores marginal comments and inserted words correctly, but still
+absorbs a red correction written directly above a word (it wrote the teacher's
+`exploded` where the child wrote `exploding`). IQ2_XXS additionally copies the
+teacher's closing comment — "Good try Joshua, it needs a lot better" — into the
+composition. It is kept as one line of the prompt because it costs almost
+nothing and helps the high quality model; it is not reliable and is not
+presented as though it were.
+
 ## 9. Still not measured
 
 - **Real handwriting.** Everything above used a rendered font. A child's actual

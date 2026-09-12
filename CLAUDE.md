@@ -240,13 +240,32 @@ The prompt is the load-bearing part. It must insist on:
 
 - Verbatim text, **including every spelling and grammar mistake**. A single silently
   corrected word makes the marking wrong.
-- Paragraph breaks preserved; line breaks within a paragraph joined up.
+- **A new paragraph is an indented first line, not a blank one.** Singapore school
+  compositions are written on ruled paper with no blank line between paragraphs — the
+  child simply starts further in from the margin. A prompt that says "keep the paragraph
+  breaks" gets a single unbroken block back, because there are no breaks to keep in the
+  form the model is looking for. It has to be told to watch the left edge.
+- **Ignore everything written in red.** Red is the teacher's: ticks, crosses, circles,
+  corrections written over a word, marginal comments, a grade at the end. A teacher's
+  correction copied into the transcript hands the child a mark for work they did not do,
+  and hides the mistake they actually made. Ignore the printed parts of a worksheet too
+  — school name, crest, the Name/Class/Subject/Date lines — and bleed-through from the
+  reverse of the sheet.
+- Line breaks within a paragraph joined up.
 - Crossed-out words omitted; carets honoured.
 - `[?]` for an unreadable word, `guess[?]` for a doubtful one, never a guessed sentence.
 - `NO_TEXT_FOUND` for a blank page or a photograph of something else.
 
 Strip code fences and the occasional "Here is the text of the page:" — models emit both
 despite being told not to.
+
+**Guard against the model arguing with itself in the output.** Thinking is off for this
+call, so there is no reasoning channel; when a page is hard, a small model transcribes
+correctly to the end and then continues *"Wait, I need to re-examine the image. Let's look
+at the red ink again. Line 1: … Line 2: …"* and finally locks into repeating one sentence
+until the token cap. Everything before the first such marker is a good transcript, so cut
+there and log that it happened rather than discarding the page — and truncate at three
+identical sentences in a row, which is never writing.
 
 **Joining pages:** if the previous page ended without terminal punctuation, the sentence
 runs on and the pages are joined with a space. Otherwise with a blank line. Joining
@@ -289,9 +308,15 @@ same script are marked against the same thing.
 ### 7.3 Output shape
 
 Markdown, in a fixed skeleton: Score (a bold `Overall: NN / 100` and a criteria table),
-What went well, What to work on, Sentences to improve (a table of at most six rows: what
-was written, a stronger version, why), **Notes on the reading**, and an Overall comment
-addressed to the child.
+What went well, What to work on, **Sentences to improve**, **Notes on the reading**, and
+an Overall comment addressed to the child.
+
+**Sentences to improve is exhaustive, not a top six.** Every sentence that would be
+meaningfully better rewritten, from the first to the last — a long composition with many
+weak sentences should produce a long table. And not only errors: a sentence belongs in it
+if it is clumsy, does not flow from the one before, repeats a shape, tells a feeling
+instead of showing it, or is vague where a detail would serve. A sentence is left out
+only if not a word of it would change.
 
 **The word count is counted by the app, never asked of the model.** Counting is
 arithmetic, and a model asked to count words will guess. It goes in the header block of
@@ -320,6 +345,20 @@ chose a fully automatic flow — photographs in, report out — so the one mitig
 to have the model flag words that look misread rather than mis-written, and to show the
 transcript on its own tab beside the marking.
 
+### 7.3a The marking must not judge what the transcript cannot carry
+
+Paragraph indentation does not survive the reading (§6, and BUILD_NOTES §8a), so a
+properly paragraphed composition can reach the marking as one unbroken block.
+
+**The prompt therefore forbids commenting on or deducting for paragraphing, layout or
+neatness**, and `levels.marks_table` describes Organisation without mentioning
+paragraphs — it is judged on the order of events, the opening, the ending and whether
+one idea leads to the next, all of which are in the words.
+
+This was found the worst way: a report asked why the whole composition was in one block,
+on a page that was correctly paragraphed. Marking a child down for something they did on
+paper and the machine failed to see is the single most damaging thing this app can do.
+
 ### 7.4 Rewrites must stay at the level
 
 A Primary 3 sentence improved into a Secondary 3 sentence is not a lesson, it is a
@@ -340,8 +379,27 @@ opens when it finishes.
   word replaced with the one clearly meant. Nothing else. Same ideas, same words wherever
   they were right, same length, same paragraphing, same title. The test: the child must
   recognise it as their own composition with the mistakes taken out.
-- **Improved rewrite**: the same story or argument, rewritten to the standard of a strong
-  script **at that level**, in words a child of that age would actually know.
+- **Improved rewrite**: the same story, reimagined and retold. The topic and the broad
+  strokes of the plot are kept — same situation, same main events in the same order, same
+  outcome — and everything else may change. Details may be replaced outright and new
+  moments or complications invented where they make the piece flow.
+
+  It aims **one level above the child's own** (`levels.NEXT_LEVEL`): a Primary 4 script is
+  rewritten to Primary 5, to show the way ahead rather than what they nearly managed.
+  Secondary 5 is skipped going up — it is the N-level year, not a step past Secondary 4 —
+  so Secondary 4 and Secondary 5 both aim at JC1, and JC2 aims at a capable adult.
+
+  **The word count is capped at 105% of the original**, counted by the app and stated in
+  the prompt as a hard ceiling, because a model asked to reimagine will otherwise return
+  half as much again. Better in the same room, not longer.
+
+  It must be paragraphed, with blank lines, and it runs with **thinking on** — it has to
+  hold a plot, a target level, a word ceiling and a paragraph structure in mind at once
+  while inventing new material inside all four.
+
+  **It is not given the marking report.** The minimal correction is, and needs it; the
+  rewrite is not, because a list of specific sentence fixes anchors it to the original's
+  sentences and is exactly what turns a reimagination back into a polish.
 
 **The two must not converge, and left to itself the model lets them.** Where a
 composition is already written well above the level it was submitted at — a strong
@@ -465,8 +523,25 @@ Single page, no framework, no bundler, no CDN. Everything served locally.
 5. **Topic** — one optional text field. Without it the model cannot judge relevance to
    task, which is a large part of the content mark; with a wrong guess it would be worse,
    so an empty topic explicitly tells the model not to speculate.
-6. **Model dropdown** — High / Low Quality, defaulting to what this machine can hold.
-   Detection picks the default; it does not overrule anyone.
+6. **Model dropdown** — High Quality, Low Quality, or **Port**. The first two default to
+   what this machine can hold; detection picks that default and does not overrule anyone.
+
+   **Port** points the app at a llama-server the operator is already running on
+   `127.0.0.1`, and loads nothing locally. A port box appears beside the dropdown,
+   defaulting to 9931. Whether that server has a vision projector is deliberately not
+   probed — the operator chose the option and knows what they are running — but without
+   `--mmproj` it will answer about a page it never saw, so the model note says so.
+
+   **The app's own llama-server runs on 8719, not 8080.** 8080 is llama.cpp's default,
+   which is precisely where an operator's own server will be sitting, and two servers
+   fighting over one port is a confusing failure for no benefit.
+
+   The model choice is remembered **as it is chosen**, not when a job starts, because
+   choosing Port and typing a number is setup rather than a per-composition decision.
+   Only "Port" is remembered: High and Low go back to being detected, since detection is
+   right about this machine and a remembered choice would outlive the card it was made
+   for. A machine set to Port is not held at the door by a health check demanding 24 GB
+   of weights it will never load.
 7. **Mark button** — disabled until there is at least one page.
 8. **Progress** — stage, percentage, elapsed, live estimate, scrolling log, Cancel.
 9. **Result** — the score as a large number, the level and topic beside it, tabs for

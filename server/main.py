@@ -118,6 +118,14 @@ async def options() -> dict:
                                   else levels.DEFAULT_KEY)
     described["default_language"] = (
         "zh" if prefs.get("language") == "zh" else "en")
+    # The model choice is remembered too, but only when it was "Port": High and
+    # Low Quality go back to being detected, because detection is right about
+    # this machine and a remembered choice would outlive the card it was made
+    # for. Pointing at your own server is a fact about your setup, not about
+    # the hardware, so that one sticks.
+    if str(prefs.get("model") or "") == hardware.EXTERNAL_KEY:
+        described["recommended"] = hardware.EXTERNAL_KEY
+    described["port"] = int(prefs.get("port") or hardware.DEFAULT_EXTERNAL_PORT)
     described["languages"] = levels.LANGUAGES
     described["max_pages"] = int(
         config.load_config()["images"].get("max_pages", 12))
@@ -126,6 +134,30 @@ async def options() -> dict:
     described["image_quality"] = float(
         config.load_config()["images"].get("jpeg_quality", 0.85))
     return described
+
+
+@app.post("/api/preferences")
+async def save_preferences(request: Request):
+    """Remember the model choice as it is made, not when a job starts.
+
+    The level and language are saved when something is actually marked -- what
+    is worth coming back to is what was used, not what was clicked past. The
+    model dropdown is different: choosing "Port" and typing a number is setup,
+    and losing it because you closed the tab before pressing Mark would be
+    irritating in a way the other two are not.
+    """
+    body = await request.json()
+    model = str(body.get("model") or "")
+    if model in hardware.BY_KEY or hardware.is_external(model):
+        config.remember("model", model)
+    port = body.get("port")
+    try:
+        port = int(port)
+    except (TypeError, ValueError):
+        port = 0
+    if 1 <= port <= 65535:
+        config.remember("port", port)
+    return {"ok": True}
 
 
 @app.get("/api/estimate")
@@ -281,6 +313,13 @@ async def start(job_id: str, request: Request):
     job.language = "zh" if str(body.get("language")) == "zh" else "en"
     job.topic = str(body.get("topic") or "").strip()[:200]
     job.model_key = hardware.resolve_key(str(body.get("model") or "auto"))
+    if hardware.is_external(job.model_key):
+        try:
+            job.external_port = int(body.get("port") or 0)
+        except (TypeError, ValueError):
+            job.external_port = 0
+        if not 1 <= job.external_port <= 65535:
+            job.external_port = hardware.DEFAULT_EXTERNAL_PORT
 
     # Remembered here rather than on every dropdown change: what is worth
     # coming back to is what was actually marked, not what was clicked past.
@@ -305,6 +344,19 @@ async def generate_correction(job_id: str, request: Request):
     kind = str(body.get("correction") or "both")
     if kind not in ("minimal", "improved", "both"):
         kind = "both"
+    # The model choice travels with the request rather than being taken from
+    # the job: a composition reopened from the history list has a job rebuilt
+    # from disk, and its recorded model may not be what is selected now.
+    requested = str(body.get("model") or "")
+    if requested:
+        job.model_key = hardware.resolve_key(requested)
+        if hardware.is_external(job.model_key):
+            try:
+                job.external_port = int(body.get("port") or 0)
+            except (TypeError, ValueError):
+                job.external_port = 0
+            if not 1 <= job.external_port <= 65535:
+                job.external_port = hardware.DEFAULT_EXTERNAL_PORT
     job.kind = "correct"
     job.correction = kind
     job.corrected_paths = []

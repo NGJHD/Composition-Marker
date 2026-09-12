@@ -28,6 +28,23 @@ STAGE_LABELS = {
 RUN_ORDER = ("prepare", "load", "transcribe", "mark")
 CORRECT_ORDER = ("prepare", "load", "correct")
 
+# How fast a stage's bar approaches full, in multiples of its expected time.
+#
+# The bar inside a stage is `1 - e^(-K * elapsed/expected)`, which cannot stall
+# and cannot overshoot. But at K = 1 it is only 63% of the way along when the
+# expected time has elapsed -- and since marking is ~90% of the whole bar, that
+# showed as a bar sitting at 67% and then snapping to 100% the instant the job
+# finished. Reported, correctly, as "it jumps from 70% to 100%".
+#
+# At K = 2.5 the same moment reads 93%, and 98% at one-and-a-half times the
+# estimate. The tail is still asymptotic, so a slow run creeps rather than
+# stalling, and the jump at the end is a few percent instead of thirty.
+#
+# The estimate is derived from the SAME number -- remaining = expected x
+# (1 - fraction) -- so the two displays cannot contradict each other, which is
+# the other half of a bug fixed earlier.
+CURVE_K = 2.5
+
 
 class Cancelled(Exception):
     """Raised inside the pipeline when the user cancels."""
@@ -56,6 +73,9 @@ class Job:
     language: str = "en"
     topic: str = ""
     model_key: str = ""
+    # Only meaningful when model_key is "port": the port the operator's own
+    # llama-server is listening on, which we talk to instead of starting ours.
+    external_port: int = 0
     correction: str = "both"                      # minimal | improved | both
 
     name: str = ""                                # the output folder's name
@@ -271,7 +291,11 @@ class Job:
         else:
             bits.append("waiting for the first token")
         if done:
-            bits.append("%.0f tokens/s" % (done / elapsed))
+            # A decimal below ten, because a slow machine reading "0 tokens/s"
+            # while it is plainly working reads as broken. Seen at 0.24 on an
+            # over-committed card.
+            rate = done / elapsed
+            bits.append(("%.1f tokens/s" if rate < 10 else "%.0f tokens/s") % rate)
         return " · ".join(bits)
 
     def tick(self, message: str = "") -> None:
@@ -291,7 +315,7 @@ class Job:
             expected_s = {"load": 90.0, "transcribe": 60.0,
                           "mark": 120.0, "correct": 120.0}.get(self.stage, 60.0)
         elapsed = time.time() - (self.stage_started_at or time.time())
-        fraction = 1.0 - math.exp(-elapsed / max(expected_s, 1.0))
+        fraction = 1.0 - math.exp(-CURVE_K * elapsed / max(expected_s, 1.0))
         # Pages give a real count to work from; blend it with the curve so the
         # bar neither stalls between pages nor jumps backwards on a fast one.
         if self.stage == "transcribe" and self.pages:
@@ -355,7 +379,7 @@ class Job:
             in_flight = expected_s * max(0.0, 1.0 - done)
         elif expected_s > 0:
             elapsed = time.time() - (self.stage_started_at or time.time())
-            in_flight = expected_s * math.exp(-elapsed / expected_s)
+            in_flight = expected_s * math.exp(-CURVE_K * elapsed / expected_s)
         else:
             in_flight = 0.0
         total = max(in_flight, 0.0)

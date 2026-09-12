@@ -135,6 +135,9 @@
           sel.appendChild(o);
         });
 
+        $("port").value = d.port || 9931;
+        updateModelChoice();
+
         var gb = d.vram_mb ? (d.vram_mb / 1024).toFixed(1) + " GB" : "unknown";
         var how = { cuda: "NVIDIA", vulkan: "Vulkan", cpu: "the processor" };
         var note = "Detected " + (d.device || "a graphics card") + " with " + gb +
@@ -148,11 +151,40 @@
         } else if (d.backend) {
           note += " Running on " + (how[d.backend] || d.backend) + ".";
         }
-        $("model-note").textContent = note;
-        sel.addEventListener("change", showEstimate);
+        state.detectedNote = note;
+        updateModelChoice();
+        sel.addEventListener("change", function () {
+          updateModelChoice();
+          savePreferences();
+          showEstimate();
+        });
+        $("port").addEventListener("change", savePreferences);
         showEstimate();
       })
       .catch(function () { /* the dropdowns stay empty; config still applies */ });
+  }
+
+  // The port box only exists when it is relevant, and the note under the
+  // dropdown has to stop claiming the graphics card decided anything once the
+  // work is being sent somewhere else entirely.
+  function updateModelChoice() {
+    var external = $("model").value === "port";
+    show("port-field", external);
+    $("model-note").textContent = external
+      ? "The pages and the marking will be sent to the llama-server already " +
+        "running on 127.0.0.1, on the port above. Nothing is loaded here, and " +
+        "it must be a server that can read images."
+      : (state.detectedNote || "");
+  }
+
+  // Saved as it is chosen, not when a job starts: choosing Port and typing a
+  // number is setup, and losing it by closing the tab would be irritating.
+  function savePreferences() {
+    fetch("/api/preferences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: $("model").value, port: $("port").value })
+    }).catch(function () { /* a remembered choice is a convenience */ });
   }
 
   function showEstimate() {
@@ -467,7 +499,8 @@
             level: $("level").value,
             language: $("language").value,
             topic: $("topic").value,
-            model: $("model").value
+            model: $("model").value,
+            port: $("port").value
           })
         }).then(json);
       })
@@ -678,7 +711,9 @@
     fetch("/api/jobs/" + state.jobId + "/correct", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ correction: $("correction").value })
+      body: JSON.stringify({ correction: $("correction").value,
+                             model: $("model").value,
+                             port: $("port").value })
     })
       .then(json)
       .then(function (res) {
