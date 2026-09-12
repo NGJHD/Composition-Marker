@@ -41,7 +41,7 @@ rem  The model weights are checked by the application rather than here, because
 rem  config.json can point models_dir somewhere else entirely and this script
 rem  cannot read it. The first screen names anything missing precisely.
 set "WARN="
-if not exist "models\Qwen3.8-27B-UD-Q4_K_M.gguf"  set "WARN=1"
+if not exist "models\Qwen3.8-27B-i1-IQ4_XS-GGUF-Smaller.gguf" set "WARN=1"
 if not exist "models\Qwen3.8-27B-UD-IQ2_XXS.gguf" set "WARN=1"
 if not exist "models\mmproj-F16.gguf"             set "WARN=1"
 if defined WARN (

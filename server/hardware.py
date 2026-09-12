@@ -1,10 +1,10 @@
 """GPU detection and LLM model selection.
 
 Which quantisation to run is a property of the machine, not a preference, so it
-is detected rather than configured. Q4_K_M is the better marker -- sub-4-bit
+is detected rather than configured. IQ4_XS is the better marker -- sub-4-bit
 quants of this model were measured mangling proper nouns and digits, and a
 marking report is full of quoted sentences that must match what the child
-actually wrote -- but its 16.5 GB of weights plus a KV cache plus the vision
+actually wrote -- but its 13.54 GB of weights plus a KV cache plus the vision
 projector needs a card that can hold most of it. Below that, IQ2_XXS at 7.3 GB
 fits whole on an 8 GB card and runs several times faster than the larger model
 would while thrashing over PCIe.
@@ -31,7 +31,13 @@ CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 # 15 GB, not 16: cards advertised as 16 GB report anywhere from 15.8 GB down
 # once the driver has taken its share, and a threshold that a 16 GB card fails
 # would be worse than useless.
-Q4_MIN_VRAM_MB = 15000
+#
+# The high-quality model needs 13.54 + OVERHEAD_GB = 15.54 GB to sit entirely
+# on the card, so a reading between this threshold and that figure takes a
+# small FFN offload rather than none. That is the intended behaviour: the
+# alternative is dropping such a machine to a 2-bit quant over a few hundred
+# megabytes.
+HQ_MIN_VRAM_MB = 15000
 
 # Headroom for the KV cache, llama.cpp's compute buffers, and -- new here --
 # the vision projector and its image encoding buffer.
@@ -59,20 +65,28 @@ FFN_FRACTION = 0.67
 
 # The one part of this file that is not the meeting app's.
 #
+# High quality is IQ4_XS, measured against Q4_K_M on the same photographs of
+# real handwriting in BUILD_NOTES section 7.6. It is the same 4-bit tier and
+# reads a page to within three words in four hundred, but at 13.54 GB it fits a
+# 16 GB card whole where Q4_K_M's 16.5 GB does not -- and "does not" there means
+# fifteen FFN blocks in system RAM and a third of the speed.
+#
 # Low quality is IQ2_XXS at the operator's request. Note what that costs: the
 # same model at IQ2_XXS was measured attaching figures to the wrong labels in a
 # meeting summary (Meeting Summariser BUILD_NOTES section 9h), and the failure
 # mode transfers -- a marking report quotes the child's own sentences back, and
-# a quantisation that paraphrases is one that invents mistakes to correct. It
+# a quantisation that paraphrases is one that invents mistakes to correct. On
+# the handwriting page in 7.6d it invented a sentence break the child never
+# wrote and then corrected the child for the fragment it had just created. It
 # is the right choice for a machine that cannot hold anything larger and the
 # wrong one for a machine that can, which is exactly what detection decides.
 MODELS = [
     {
-        "key": "q4_k_m",
-        "file": "Qwen3.8-27B-UD-Q4_K_M.gguf",
-        "label": "High Quality: Qwen3.8-27B-UD-Q4_K_M",
-        "size_gb": 16.5,
-        "min_vram_mb": Q4_MIN_VRAM_MB,
+        "key": "iq4_xs",
+        "file": "Qwen3.8-27B-i1-IQ4_XS-GGUF-Smaller.gguf",
+        "label": "High Quality: Qwen3.8-27B-i1-IQ4_XS",
+        "size_gb": 13.54,
+        "min_vram_mb": HQ_MIN_VRAM_MB,
     },
     {
         "key": "iq2_xxs",
@@ -365,7 +379,7 @@ def choose_key(vram_mb: int) -> str:
     A unified-memory GPU never gets the large one, whatever it advertises. The
     figure is a share of system RAM rather than a budget: a Radeon 780M reports
     18 GB on a 32 GB machine, which clears the 15 GB threshold and would select
-    the 16.5 GB model -- on a device that will not allocate 4. It also runs on
+    the 13.5 GB model -- on a device that will not allocate 4. It also runs on
     the CPU there, where the smaller model is several times faster and leaves
     the machine usable.
     """
@@ -389,6 +403,82 @@ def resolve_key(requested: str, vram_mb: int | None = None) -> str:
 def model_path(key: str):
     return config.models_dir() / BY_KEY[key]["file"]
 
+
+
+# ---------------------------------------------------------------------------
+# multi-token prediction
+# ---------------------------------------------------------------------------
+
+# Qwen3.8-27B ships a multi-token-prediction layer as block 64, and llama.cpp
+# will use it as its own draft model -- speculative decoding with no second
+# file to load. Measured on an RTX 5060 Ti with the high-quality weights:
+#
+#     without --spec-type draft-mtp    25.8 tok/s    14.9 GB
+#     with    --spec-type draft-mtp    45.7 tok/s    15.7 GB
+#
+# 1.77x for 0.8 GB, which is the best trade in this file.
+#
+# It cannot be passed unconditionally, because **not every quantisation keeps
+# the layer**: the high-quality weights carry it, and Unsloth's IQ2_XXS does
+# not. Without it the server logs a dozen
+# "model has unused tensor blk.64.* -- ignoring" lines and drafts from nothing.
+#
+# Detected from the file rather than declared in the table above: a declaration
+# would be a second thing to keep true, and paths.models_dir or an explicit
+# llm.model path can name weights this file has never seen.
+
+# The discriminator is the block prefix, NOT the word "nextn". "nextn" appears
+# around offset 1,400 of *both* quantisations, in the architecture metadata --
+# the model declares that it has an MTP design whether or not this file kept
+# the weights for it. Only "blk.64." tracks the tensors actually present.
+MTP_TENSOR_PREFIX = b"blk.64."
+
+# The tensor names sit after the metadata, and the metadata is dominated by the
+# tokenizer vocabulary: on these files "blk.64." lands near 11 MB, so a window
+# sized by intuition (8 MB was tried) reports every model as having no MTP
+# layer and silently gives up 1.77x. Read in chunks to a hard ceiling instead,
+# overlapping by the pattern length so a name split across a chunk boundary is
+# still found.
+_MTP_SCAN_LIMIT = 64 * 1024 * 1024
+_MTP_CHUNK = 4 * 1024 * 1024
+
+_mtp_cache: dict = {}
+
+
+def model_has_mtp(path) -> bool:
+    """True if these weights carry the MTP layer llama.cpp can draft from.
+
+    Cached by path, size and modification time: it is asked once per job start,
+    and an operator who swaps a file for another of the same name should not be
+    given the previous answer.
+    """
+    try:
+        stat = path.stat()
+    except OSError:
+        return False
+    key = (str(path), stat.st_mtime_ns, stat.st_size)
+    if key in _mtp_cache:
+        return _mtp_cache[key]
+
+    found = False
+    try:
+        with open(path, "rb") as fh:
+            read = 0
+            tail = b""
+            while read < _MTP_SCAN_LIMIT:
+                chunk = fh.read(_MTP_CHUNK)
+                if not chunk:
+                    break
+                read += len(chunk)
+                if MTP_TENSOR_PREFIX in tail + chunk:
+                    found = True
+                    break
+                tail = chunk[-len(MTP_TENSOR_PREFIX):]
+    except OSError:
+        found = False
+
+    _mtp_cache[key] = found
+    return found
 
 def offload_regex(key: str, vram_mb: int) -> str:
     """How much of the FFN stack has to live in system RAM on this card.

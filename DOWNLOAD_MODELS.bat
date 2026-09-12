@@ -54,15 +54,20 @@ rem  parenthesised if-block, and cmd would treat them as block delimiters.
 
 set "QWEN=https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/4ca720788d1e01f1bff70c033e0d0028fd02e502"
 
+rem  High quality comes from a different repository: it is a hybrid quant --
+rem  IQ4_XS attention over IQ3_S feed-forward -- which is how it lands 3 GB
+rem  under Q4_K_M and still fits a 16 GB card whole. BUILD_NOTES section 7.6.
+set "IQ4XS=https://huggingface.co/jrell/Qwen3.8-27B-i1-IQ4_XS-GGUF-Smaller/resolve/bcb1edfb517aa9ae2443bf22961862a3b7a4a5a6"
+
 rem  Both ship: the app picks by video memory at startup and the dropdown lets
 rem  the user override, so either may be selected on any machine.
 call :get "models\Qwen3.8-27B-UD-IQ2_XXS.gguf" 7000000000 ^
   "%QWEN%/Qwen3.8-27B-UD-IQ2_XXS.gguf?download=true" ^
   "Language model, Low Quality - 7.3 GB"
 
-call :get "models\Qwen3.8-27B-UD-Q4_K_M.gguf" 16000000000 ^
-  "%QWEN%/Qwen3.8-27B-UD-Q4_K_M.gguf?download=true" ^
-  "Language model, High Quality - 16.5 GB, this is the long one"
+call :get "models\Qwen3.8-27B-i1-IQ4_XS-GGUF-Smaller.gguf" 13000000000 ^
+  "%IQ4XS%/Qwen3.8-27B-i1-IQ4_XS-GGUF-Smaller.gguf?download=true" ^
+  "Language model, High Quality - 13.5 GB, this is the long one"
 
 rem  A fresh clone of the source repository has no models\ at all, because the
 rem  whole folder is gitignored. In a release zip this file is already present
