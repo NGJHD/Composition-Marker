@@ -44,7 +44,7 @@ downloaded, because nothing needs to be: the files are already there.
 
 ## First-time setup
 
-Everything is in the folder except the two language models, which are 24 GB between them
+Everything is in the folder except the two language models, which are 21 GB between them
 and too large to ship. On a machine with internet access, run
 **`DOWNLOAD_MODELS.bat`** once. It fetches those two files and nothing else, skips
 anything already present, and can be re-run safely if the connection drops.

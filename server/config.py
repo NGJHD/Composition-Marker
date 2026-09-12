@@ -209,13 +209,21 @@ _DEFAULTS = {
         "max_correct_tokens": 4000,
         # The improved rewrite runs with thinking on and writes a whole
         # composition, so it needs room for both -- and 8,000 was not room for
-        # both. Measured on a 400-word P4 script: the reasoning alone runs to
-        # ~6,900 tokens and the whole call lands at 10,563, so at 8,000 it hit
-        # the cap mid-thought and returned no answer at all, on Q4_K_M and
-        # IQ4_XS alike. 12,000 leaves headroom without approaching ctx_size,
-        # which at 16384 against a ~1,400-token prompt allows about 14,900.
-        # reasoning_effort is not the lever here: "low" spent the same 8,000
-        # and also returned nothing. BUILD_NOTES section 7.6g.
+        # both: the cap fell mid-thought and the call returned an empty
+        # content, on Q4_K_M and IQ4_XS alike.
+        #
+        # 12,000 is better and is not a cure. Measured reasoning on one
+        # 399-word script ran 9,815 / 10,125 / 10,563 / >12,000 / >12,000
+        # tokens -- unbounded, so no budget inside a 16,384 context catches
+        # every call, and the ones it misses fall through to the
+        # retry-without-thinking path. reasoning_effort is not the lever:
+        # "low" spent the same 8,000 and also returned nothing.
+        #
+        # It cannot simply be raised to the context ceiling either. At 14,000
+        # only ~2,300 tokens are left for a prompt that carries the whole
+        # composition plus two sections of the marking report: fine for a P4
+        # script, not for a JC2 essay. BUILD_NOTES section 7.6g has the two
+        # real ways out, both of which are design changes rather than numbers.
         "max_improved_tokens": 12000,
     },
     "thinking": {

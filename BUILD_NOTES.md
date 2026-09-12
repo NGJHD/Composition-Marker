@@ -835,51 +835,88 @@ version**, new sensory detail and a new closing reflection that appear nowhere i
 original, properly paragraphed, and pitched at about P5. It came back at 426 words against
 the 420-word ceiling — 1.5% over, not worth a guard.
 
-### 7.6g The improved rewrite's token budget was simply too small
+### 7.6g The improved rewrite's budget, and why thinking stays on
 
-On **both** Q4_K_M and IQ4_XS the `correct-improved` call spent its entire 8,000-token
-budget on reasoning and returned no answer, then succeeded on the automatic thinking-off
-retry. Same failure, same place, at 8.5 and 25 tok/s alike, so it was never the weights.
+On both Q4_K_M and IQ4_XS the `correct-improved` call spent its entire 8,000-token budget
+on reasoning and returned no answer, then succeeded on the automatic thinking-off retry.
+Same failure, same place, at 8.5 and 25 tok/s alike, so it was never the weights.
 
-Four runs of the app's own `correct_improved` prompt against the same script settle what
-it was:
+`max_tokens` covers the reasoning as well as the answer, and the reasoning here is long
+and **unbounded**. Every measurement of it, on the same 399-word P4 script:
 
-| thinking | budget | finish | completion | answer |
+| thinking | budget | reasoning spent | finish | answer |
 |---|---|---|---|---|
-| `medium` | 8,000 | `length` | 8,000 | **none** |
-| `low` | 8,000 | `length` | 8,000 | **none** |
-| off | 4,000 | `stop` | 336 | 272 words |
-| **`medium`** | **14,000** | **`stop`** | **10,563** | **418 words** |
+| `medium` | 8,000 | 8,000, capped | `length` | **none** |
+| `low` | 8,000 | 8,000, capped | `length` | **none** |
+| `medium` | 12,000 | 9,815 | `stop` | 398 words |
+| `medium` | 14,000 | 10,563 | `stop` | 418 words |
+| `medium` | 12,000 (in app) | 10,125 | `stop` | 409 words |
+| `medium` | 12,000 (in app) | 12,000, capped | `length` | none → retry gave 407 |
+| `medium` | 12,000 (in app) | 12,000, capped | `length` | none → retry gave **201** |
+| off | 4,000 | — | `stop` | 402 / 341 / 341 / 456 words |
 
-**`reasoning_effort` is not a control here.** `low` spent the identical 8,000 tokens and
-returned the identical nothing. Whatever that parameter does to this model on this task, it
-does not shorten the reasoning.
+**`reasoning_effort` is not a control.** `low` spent the identical 8,000 and returned the
+identical nothing.
 
-**The budget is the control, and the number needed is about 10,600.** The reasoning alone
-runs to ~6,900 tokens; the rewrite follows it inside the same completion. At 8,000 the cap
-lands mid-thought, and because the answer had not started yet, `content` is empty — the
-call looks like a total failure rather than a truncation.
+**No budget inside a 16,384 context reliably contains it.** Observed reasoning runs from
+9,815 to over 12,000 tokens with no ceiling found. `max_improved_tokens` is now 12,000 —
+strictly better than 8,000, and it catches the shorter reasoning — but roughly a third to
+a half of calls still hit the cap and fall through to the retry.
 
-So `max_improved_tokens` goes to **12,000**. Headroom above the 10,563 observed, and well
-under the ceiling: `ctx_size` is 16384 against a ~1,400-token prompt, so about 14,900 is
-available. Raising `ctx_size` is not required and would cost KV cache for nothing.
+### Thinking earns its place, and the evidence is the word count
 
-**This vindicates CLAUDE.md section 8's "it runs with thinking on".** The thinking-on
-answer came back at 418 words against the 420-word ceiling — the best-calibrated length
-of anything measured here — while the thinking-off draw came back at 272, a third short of
-the original, which section 8 forbids. Thinking is what holds the word ceiling while the
-model invents new material, exactly as section 8 claims. (Two earlier thinking-off retries
-in the pipeline gave 426 and 387 words, so 272 is one draw and not a reliable shortfall.
-The point stands either way: with the budget raised there is no reason to find out.)
+This was tested precisely because the obvious response to an unreliable feature is to turn
+it off. Against the 399-word original and the 105% ceiling of 419:
 
-Note that section 10.2's sampling table lists `correct` as thinking **off**, which reads as
-a contradiction of section 8. It is not quite one — the table predates the split into
-`correct_minimal` and `correct_improved`, and 8 is the specific case — but the table should
-say so rather than leave the reader to reconcile them.
+| | words | in range? |
+|---|---|---|
+| thinking on | 398, 409, 418 | **3 of 3** |
+| thinking off | 402, 341, 341, 456 | **1 of 4** |
+| retry after a blown cap | 407, 201 | 1 of 2 |
 
-**It is also not slower.** The old path spent ~360 s failing and then ~35 s on the retry
-to produce a short rewrite; the new one spends ~415 s and produces a correctly sized one.
-With MTP on (7.6i) that comes down to about four minutes.
+**Thinking is what holds the word ceiling.** Without it the rewrite came back 15% short
+twice and 9% over the ceiling once — breaking section 8 at both ends, which requires that
+it never come back shorter and never exceed 105%. With it, three runs landed within 5% of
+the original every time. Section 8's claim that the rewrite "has to hold a plot, a target
+level, a word ceiling and a paragraph structure in mind at once" is not a rationalisation;
+it is measurable, and the word count is where it shows.
+
+Two smaller marks against thinking-off, both on the same runs that came back short: each
+opened with an **invented title** on a composition that has none, and one leaked Markdown
+italics into the prose. `_keep_title` restores a dropped title; nothing removes an added
+one.
+
+On prose quality alone the honest answer is that the single clean thinking-on sample is
+the best of them — it dramatises the misread clock rather than announcing it — but one
+sample against one sample is not evidence, and the word count is. **Thinking stays on.**
+
+### What is still wrong, and the two ways out
+
+The defect that reaches the child is the retry: when the cap blows, the fallback is a
+thinking-off call, which inherits thinking-off's length variance, and one of them returned
+**201 words against a 399-word original**. A half-length rewrite is worse than a late one.
+
+1. **A mechanical length check.** Section 8 already establishes the principle for exactly
+   this — "the title is restored in code, not asked for in the prompt... where a
+   requirement is mechanical, do it mechanically." A rewrite outside roughly 90-105% of
+   the original is a failed rewrite and should be re-asked, whatever produced it. This
+   fixes the harm without touching the context or the backend.
+2. **A larger context.** `ctx_size` 16384 was chosen in CLAUDE.md section 4 on the
+   grounds that the largest call is "the whole composition with the rubric and the model's
+   thinking (~8k)". That is now out of date: this call wants 1,354 + 12,000 and is the
+   largest in the app by a wide margin. Raising the context to 24576 would allow a
+   16,000-token budget, but the KV cache grows by ~0.26 GB and the MTP draft context has
+   only 474 MB of headroom to give (7.6j) — so it trades against MTP, or against a fully
+   resident model on a 16 GB card.
+
+Option 1 is the cheaper and better-targeted fix and does not trade against anything. Not
+implemented: it is new behaviour rather than a corrected measurement, and that is the
+operator's call.
+
+Note also that `max_improved_tokens` cannot simply be pushed to the context ceiling. At
+14,000 only ~2,300 tokens are left for the prompt, and the improved prompt carries the
+composition plus two sections lifted off the marking report — comfortable for a 400-word
+P4 script, not for a JC2 essay.
 
 ### 7.6h Recommendation
 

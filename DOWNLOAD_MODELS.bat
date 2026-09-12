@@ -21,7 +21,7 @@ echo.
 echo   Composition Marker - downloading the language models
 echo   ----------------------------------------------------
 echo.
-echo   Two files, about 24 GB in total. Everything else is already in
+echo   Two files, about 21 GB in total. Everything else is already in
 echo   this folder.
 echo.
 echo   This will take a while. Already-downloaded files are skipped, so it

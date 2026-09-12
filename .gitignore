@@ -1,6 +1,6 @@
 # Composition Marker — what does NOT belong in the repository.
 #
-# The app ships as an unzipped folder containing ~26 GB of binaries and model
+# The app ships as an unzipped folder containing ~23 GB of binaries and model
 # weights. None of that is source, and none of it is versionable. The repo
 # holds the orchestration code, the prompts and the frontend;
 # DOWNLOAD_MODELS.bat fetches everything else.

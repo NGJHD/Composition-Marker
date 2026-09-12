@@ -476,12 +476,19 @@ shares the same memory bus.
 | correct, improved | **on**, `medium` | 0.7 | 0.8 | it holds a plot, a level and a word ceiling at once — see §8 |
 
 The two corrections are listed separately because they want opposite things. The minimal
-one is mechanical and reasoning buys it nothing. The improved one needs it, and needs the
-room for it: **budget the improved call at least 12,000 tokens.** `max_tokens` covers the
-reasoning as well as the answer, and at 8,000 the cap landed mid-thought and the call
-returned an empty `content` — a total failure rather than a truncation, on every
-quantisation tried. `reasoning_effort` does not help: `low` spent the same 8,000 and also
-returned nothing. See BUILD_NOTES §7.6g.
+one is mechanical and reasoning buys it nothing. The improved one needs it — **thinking is
+what holds the word ceiling**, measured: with it, three runs landed within 5% of the
+original; without it, the rewrite came back 15% short twice and over the 105% ceiling
+once, breaking §8 at both ends.
+
+It needs room for it, and **the reasoning is unbounded.** `max_tokens` covers the
+reasoning as well as the answer; at 8,000 the cap landed mid-thought and the call returned
+an empty `content` — a total failure rather than a truncation. `max_improved_tokens` is
+12,000, which is better and is not a cure: measured reasoning ran from 9,815 to over
+12,000 tokens on one script, so some calls still fall through to the retry. It cannot be
+raised to the context ceiling either, because the prompt carries the whole composition.
+`reasoning_effort` does not help: `low` spent the same 8,000 and also returned nothing.
+See BUILD_NOTES §7.6g, which sets out the two real fixes.
 
 `reasoning_effort` accepts **`xhigh`, `medium`, `low` only**. Anything else raises inside
 the Jinja template and surfaces as HTTP 500, so validate before dispatch.
@@ -538,7 +545,7 @@ Single page, no framework, no bundler, no CDN. Everything served locally.
    choosing Port and typing a number is setup rather than a per-composition decision.
    Only "Port" is remembered: High and Low go back to being detected, since detection is
    right about this machine and a remembered choice would outlive the card it was made
-   for. A machine set to Port is not held at the door by a health check demanding 24 GB
+   for. A machine set to Port is not held at the door by a health check demanding 21 GB
    of weights it will never load.
 7. **Mark button** — disabled until there is at least one page.
 8. **Progress** — stage, percentage, elapsed, live estimate, scrolling log, Cancel.
