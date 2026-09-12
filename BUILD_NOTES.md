@@ -1159,6 +1159,65 @@ Installing is refused while a job is running. The update ends with this process 
 and taking a marking run and its llama-server down behind the user's back is not a thing
 to do.
 
+### 7.6o The update button, tested end to end -- and the bug that only that found
+
+`tools/check_release.py` was ported from the Meeting Summariser and earned itself on its
+first run against a published release. The release page looked right, both assets were
+right, the version arithmetic was right, and the button was still broken:
+
+    AttributeError: module 'server.updater' has no attribute 'is_our_asset_url'
+
+The function was written, then lost: a later edit replaced the block between `pick_asset`
+and `check()` to delegate asset choice to `version.pick_asset`, and it sat between them.
+`main.py` calls it on every install request, so **v1.1.0 shipped with Check working and
+Install returning 500.** Both published assets carried it, so the fix is v1.1.1 rather
+than a re-upload -- GitHub's CDN serves the old bytes for some time after a clobber, so
+some users would get one zip and some the other from the same link. v1.1.0's notes carry
+a warning, since editing notes is safe where replacing an asset is not.
+
+**A second bug the same reading caught, before it shipped.** `pick_asset` preferred a
+`-source.zip` suffix and otherwise fell back to *the first zip on the release*. Once a
+release carries both assets that could select the 1.52 GB `-full` bundle and robocopy it
+over a running install, `runtime\python.exe` included -- the interpreter the updater is
+executing from. A half-copied interpreter cannot start, so it cannot self-repair either.
+The sibling app's `make_release.py` states this outright, which is the whole argument for
+having read it rather than inventing a convention.
+
+### The end-to-end test
+
+A throwaway copy of the committed tree with the real `runtime\`, pinned to 1.0.5, with
+three markers planted to prove the copy did real work rather than appearing to:
+
+| Marker | Must | Result |
+|---|---|---|
+| `APP_VERSION` 1.0.5 | become 1.1.1 | **1.1.1** |
+| `output\Keep Me\keep.md` | survive -- proves no `/MIR` | **kept** |
+| hand-edited `ctx_size: 11111` | survive -- proves the payload omits config.json | **11111** |
+
+The whole sequence ran: `downloading` -> `ready` -> the server exited to release the lock
+-> the script waited, copied, and relaunched. The robocopy log is the proof the file-lock
+wait works rather than hanging the way `tasklist | find` does:
+
+    waiting for the application to close
+    closed after 2 tries
+    copied
+
+**And the application came back by itself**, serving 1.1.1 on the port `run.bat` picked.
+Staging was swept, and the `.cmd` deleted itself -- only the log remained, which is what
+the 24-hour sweep is for.
+
+One false start worth recording: the first attempt's copy lacked `bin\`, so the relaunched
+`run.bat` refused to start and named `bin\llama-*\llama-server.exe` as missing. That was a
+defect in the test rig, not the updater, and it incidentally demonstrated the preflight
+doing its job -- naming the missing file plainly rather than vanishing.
+
+### What is still not tested
+
+The failure paths. A download interrupted midway, a read-only install folder, a release
+whose zip is not this application, and a version mismatch between the download and the tag
+are all handled in code and none has been exercised against a real release. The mismatch
+one is the load-bearing check -- it is what stops a wrong or tampered zip being installed.
+
 ## 8. Acceptance tests (CLAUDE.md section 14)
 
 | # | Test | Status |
