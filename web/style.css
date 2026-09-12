@@ -88,10 +88,9 @@ h1 {
 
 /* ---- drop zone ---- */
 
-/* Ruled paper, literally: repeating-linear-gradient draws the lines, and the
-   dashed border is the edge of the sheet. It is the only illustrative moment
-   in the interface and it is doing a job — saying "put pages here" without a
-   word or an icon. */
+/* A plain sheet: the dashed border is the edge of it. The ruled lines that used
+   to be drawn across the inside read as clutter behind the text rather than as
+   paper, so the border carries the "put pages here" on its own. */
 .drop {
   border: 1px dashed var(--rule);
   border-radius: var(--radius);
@@ -100,9 +99,6 @@ h1 {
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s;
   background-color: var(--paper-soft);
-  background-image: repeating-linear-gradient(
-    to bottom, transparent 0 27px, var(--rule) 27px 28px);
-  background-position: 0 6px;
 }
 .drop:hover, .drop:focus-visible { border-color: var(--ink-soft); background-color: #f2f6fc; outline: none; }
 .drop:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

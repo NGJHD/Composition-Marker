@@ -10,7 +10,7 @@
   var state = {
     jobId: null, events: null, timer: null, started: 0,
     pages: [], docs: {}, tab: null, phase: "mark",
-    opts: {}, name: null, dragFrom: null, viewing: null
+    opts: {}, name: null, dragFrom: null, dragged: false, viewing: null
   };
 
   /* ---------------------------------------------------------------- boot */
@@ -142,7 +142,7 @@
         var how = { cuda: "NVIDIA", vulkan: "Vulkan", cpu: "the processor" };
         var note = "Detected " + (d.device || "a graphics card") + " with " + gb +
                    " of video memory, so " +
-                   (d.recommended === "q4_k_m" ? "High Quality" : "Low Quality") +
+                   (d.recommended === "iq4_xs" ? "High Quality" : "Low Quality") +
                    " is selected. You can change it.";
         if (d.uma) {
           note += " This machine shares its memory with the graphics chip, so " +
@@ -359,11 +359,17 @@
       var img = document.createElement("img");
       img.src = page.url;
       img.alt = "Page " + (i + 1);
-      img.title = "Double-click to see this page full size";
-      // Double-click, not click: a single click is how you pick a thumbnail
-      // up to drag it, and opening an overlay on every failed drag would be
-      // maddening.
-      img.addEventListener("dblclick", function () { openViewer(i); });
+      img.title = "Click to see this page full size";
+      // A single click opens it. Dragging a thumbnail to reorder it must not
+      // also open it, so `dragged` is raised on dragstart and checked here.
+      // It is cleared on mousedown rather than after the check: a drag does
+      // not reliably end in a click at all, so clearing it on use would leave
+      // it raised and swallow the next real click. Every interaction starts
+      // with a mousedown, which makes that the one place it is certainly stale.
+      li.addEventListener("mousedown", function () { state.dragged = false; });
+      img.addEventListener("click", function () {
+        if (!state.dragged) openViewer(i);
+      });
       li.appendChild(img);
 
       var bar = document.createElement("div");
@@ -393,6 +399,7 @@
 
       li.addEventListener("dragstart", function (e) {
         state.dragFrom = i;
+        state.dragged = true;
         li.classList.add("dragging");
         try { e.dataTransfer.setData("text/plain", String(i)); } catch (err) { /* Firefox needs the call, not the value */ }
         e.dataTransfer.effectAllowed = "move";
