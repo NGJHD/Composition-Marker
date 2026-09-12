@@ -118,18 +118,37 @@ def transcribe_pages(job: Job, server: llm.LlamaServer, cfg: dict) -> str:
             page_total=total,
             language_name=LANGUAGE_NAMES.get(job.language, "English"),
         )
+        parts = [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": llm.data_url(page)}},
+        ]
         text = server.chat(
-            [
-                {"type": "text", "text": prompt},
-                {"type": "image_url",
-                 "image_url": {"url": llm.data_url(page)}},
-            ],
+            parts,
             thinking=bool(thinking.get("transcribe", False)),
             max_tokens=max_tokens,
             temperature=0.2,          # copying, not composing
             top_p=0.9,
             stage="transcribe",
         )
+        # A page declared empty is worth one more look before it is believed.
+        #
+        # Measured on a real first page -- a school worksheet with a printed
+        # header above the composition -- the model answered NO_TEXT_FOUND on
+        # roughly half of otherwise identical runs, and the whole page vanished
+        # from the transcript in silence. A second attempt at a slightly higher
+        # temperature usually reads it. This is the one answer in the app that
+        # discards a page, so it should have to be given twice.
+        if _clean_page(text).upper().startswith(NO_TEXT):
+            job.log("page %d: the model called this page empty; looking again"
+                    % index)
+            text = server.chat(
+                parts,
+                thinking=bool(thinking.get("transcribe", False)),
+                max_tokens=max_tokens,
+                temperature=0.5,
+                top_p=0.9,
+                stage="transcribe-retry",
+            )
         elapsed = time.time() - started
         calibration.record(job.model_key, "transcribe_page", elapsed)
         job.page_index = index
@@ -152,7 +171,11 @@ def transcribe_pages(job: Job, server: llm.LlamaServer, cfg: dict) -> str:
                 cleaned = cleaned[:cut].rstrip()
             cleaned = _unwrap(_apply_para_marks(cleaned))
         if cleaned == NO_TEXT or not cleaned:
-            job.log("page %d: no handwriting found (%.0fs)" % (index, elapsed))
+            # Say what the model actually replied. A page dropped in silence is
+            # indistinguishable from a blank sheet, and the two need completely
+            # different responses from whoever is looking at the log.
+            job.log("page %d: no handwriting found (%.0fs); the model replied: %s"
+                    % (index, elapsed, _snippet(text)))
             continue
         job.log("page %d: %s in %.0fs" % (index, _size_of(cleaned, job.language),
                                           elapsed))
@@ -170,6 +193,14 @@ def transcribe_pages(job: Job, server: llm.LlamaServer, cfg: dict) -> str:
     # did, so joining on a blank line would invent paragraphing that the
     # marking would then reward or punish.
     return _join_pages(chunks)
+
+
+def _snippet(text: str, limit: int = 220) -> str:
+    """A one-line look at what a model said, for the log."""
+    flat = " ".join((text or "").split())
+    if not flat:
+        return "(nothing at all)"
+    return flat[:limit] + ("..." if len(flat) > limit else "")
 
 
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$")

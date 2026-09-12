@@ -730,15 +730,33 @@ Four approaches, on the operator's own photographed pages:
 | "one ruled line per output line, four spaces for an indent" | **`NO_TEXT_FOUND`** — gave up entirely | not reached |
 | nothing about paragraphs | one block | one block |
 
-The `[P]` row is the decisive one. It is not a quantisation limit: the high
-quality model fails it identically. The vision path reads the *words* on a line
-and does not attend to where the line starts. Asking it to do so in the same
-call as the transcription makes the low model abandon the page.
+**Corrected, after testing on a second composition: `[P]` does work, on some
+pages.** The table above was measured entirely on the red-marked pages, and
+generalising from them was wrong.
 
-The code side is in place and costs nothing — `_apply_para_marks` honours both
-`[P]` markers and genuine leading indentation, so a model that ever reports
-either will get paragraphs — but **no model shipped here reports either**, and
-more prompt engineering is not going to change that.
+On a clean two-page script in blue ink, IQ2_XXS emitted `[P]` three times on
+page 1 and the transcript came back correctly broken into three paragraphs at
+exactly the child's indents. On page 2 of the same composition it missed the
+one indent there. So:
+
+| Page | Markers |
+|---|---|
+| Blue ink, clean, printed school header | 3 of 3 |
+| Blue ink, page 2 of the same script | 0 of 1 |
+| Pencil, heavy red teacher annotation | 0 of 3 |
+
+Partial, and better on a clean page than a marked-up one — which is what you
+would expect if the model is attending to the left edge but losing it among
+other marks. `_apply_para_marks` honours both `[P]` and genuine leading
+indentation, so whatever the model does report is used.
+
+The honest summary is that paragraphing is recovered often enough to be worth
+having and not reliably enough to be judged on, which is exactly why §8c exists.
+
+If it needs to be reliable, the browser route stands: it already draws every
+page to a canvas to resize it, so it could measure the leftmost dark pixel per
+text row and send the paragraph positions with the image. Deterministic, no new
+dependency, and not subject to any of this.
 
 The real fix, if it is wanted, is to stop asking: the browser already draws
 every page to a canvas to resize it, so it could find the leftmost dark pixel
@@ -747,6 +765,34 @@ positions along with the image. That is deterministic pixel measurement rather
 than a model judgement, it needs no new Python dependency, and it is the only
 approach here that does not depend on the model noticing something it has
 demonstrated twice that it does not notice.
+
+## 8c. A whole page silently dropped, about half the time
+
+Reported as "the transcript only reads page 2", and it was a regression from the
+red-ink work in the same session.
+
+The model was replying **`NO_TEXT_FOUND` for page 1** — not a cleaning-pipeline
+fault, an actual refusal, on roughly every other run of the identical input.
+
+Page 1 is the one carrying the printed school worksheet header: crest, PALM VIEW
+PRIMARY SCHOOL, Name / Class / Subject / Date, a Draft/Final box. The new prompt
+told the model to skip printed matter, and it over-applied that to the whole
+sheet: a form, therefore not a composition, therefore empty.
+
+Two fixes, because the cause and the flakiness are separate problems:
+
+- The prompt now says plainly that most pages carry printed matter as well as
+  the composition, that such a page is a **normal** page, and that skipping the
+  printed parts means leaving them out of the reply rather than treating the
+  page as blank. Five consecutive runs afterwards: no page dropped, and the
+  retry below never fired.
+- A page declared empty is **asked again**, once, at a slightly higher
+  temperature. This is the only answer in the app that discards a page outright,
+  so it should have to be given twice.
+
+And a page rejected for any reason now logs what the model actually said. The
+whole diagnosis above took one line of log once that existed; before it, a
+dropped page and a genuinely blank sheet looked identical.
 
 ## 8b. Two failures the red-ink instruction introduced
 

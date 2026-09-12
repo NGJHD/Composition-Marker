@@ -32,7 +32,18 @@ Not a preamble, not "here is the text", not a note about the image or how it is
 oriented, not a comment on the handwriting, not a closing remark. Begin your
 reply with the child's first word and end it with their last one.
 
-If the page has no handwritten composition on it -- it is blank, or it is a
-photograph of something else -- reply with exactly:
+ONE EXCEPTION, AND ONLY ONE
+
+If there is **no handwriting on the page at all** -- it is blank ruled paper,
+or a photograph of something that is not a page of writing -- reply with
+exactly:
 
 NO_TEXT_FOUND
+
+Be careful here. Most pages carry printed matter as well as the composition: a
+school name, a crest, Name and Class and Date lines, a Draft/Final box, a
+footer. **A page like that is a normal page and you must transcribe the
+handwriting on it.** Skipping the printed parts means leaving them out of your
+reply, not treating the page as empty.
+
+If you can see even one handwritten sentence, the page has a composition on it.
