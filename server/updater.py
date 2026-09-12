@@ -147,41 +147,20 @@ def _get_json(url: str, timeout: float = 15.0) -> dict:
         raise UpdateError("GitHub's answer could not be read.") from exc
 
 
-def pick_asset(release: dict) -> dict | None:
-    """The one .zip on the release. Nothing else is looked at.
+def pick_asset(release: dict):
+    """The update payload on this release, or None.
+
+    Delegates the choosing to version.pick_asset, which is pure and therefore
+    testable without a network: it skips the -full first-install bundle, which
+    must never be robocopied over a running install because it carries the
+    interpreter the app is executing from.
 
     GitHub's own "Source code (zip)" is not an asset -- it is `zipball_url` --
-    so a release with nothing attached returns None and the user is told the
+    so a release with nothing attached returns None, and the user is told the
     release cannot be installed automatically rather than being handed a
     download that is missing run.bat.
     """
-    assets = release.get("assets") or []
-    zips = [a for a in assets
-            if str(a.get("name", "")).lower().endswith(".zip")
-            and a.get("browser_download_url")]
-    if not zips:
-        return None
-    # Prefer the suffix this app publishes, so a release that also carries an
-    # unrelated zip still resolves.
-    suffix = getattr(version, "ASSET_SUFFIX", "")
-    if suffix:
-        for a in zips:
-            if str(a["name"]).lower().endswith(suffix.lower()):
-                return a
-    return zips[0]
-
-
-def is_our_asset_url(url: str) -> bool:
-    """Only a release asset from this application's own repository.
-
-    The URL reaches the install endpoint from the page, which means it is not
-    to be trusted to point wherever it likes -- the same reason UPDATE_BUTTON.md
-    re-checks the prefix in the main process rather than believing the
-    renderer. A general-purpose "download and run this" bridge is a hole worth
-    not opening, and this one ends in code being copied over the application.
-    """
-    prefix = "https://github.com/%s/releases/download/" % version.GITHUB_REPO
-    return url.startswith(prefix) and ".." not in url
+    return version.pick_asset(release.get("assets") or [])
 
 
 def check() -> dict:

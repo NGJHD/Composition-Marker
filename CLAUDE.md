@@ -181,7 +181,11 @@ CompositionMarker\
     llm.py             <- llama-server lifecycle, chat and vision calls
     pipeline.py        <- stage orchestration, documents
     jobs.py            <- job state, cancellation, cleanup
-    version.py         <- app name, author, version, repo. Nothing else
+    updater.py         <- the update button: the one outbound path (§0)
+    version.py         <- app name, author, version, repo, asset choice
+  tools\               <- development only; excluded from both release zips
+    make_release.py    <- builds the two assets
+    check_release.py   <- asks GitHub what an installed copy would do
   temp\
     pages\             <- the uploaded photographs; emptied every run
   output\
@@ -195,6 +199,24 @@ CompositionMarker\
 
 Filenames keep the composition prefix inside the folder, so a document still identifies
 itself once copied out of it.
+
+`tools\` is an addition to this layout, carried over from the Meeting Summariser. It is
+not part of the application and never reaches a user: `make_release.py` excludes it from
+both zips. It exists so that cutting a release is reproducible from the repository rather
+than from a command somebody typed once.
+
+**A release carries two assets and they are not variants of the same thing:**
+
+| | |
+|---|---|
+| `Composition-Marker-vX.Y.Z.zip` | ~150 KB. The **update payload** -- what the in-app button downloads and robocopies over an install. It must never carry `runtime\python.exe`, because that is the interpreter the running app is executing from. `version.pick_asset` skips anything marked `-full` for that reason. |
+| `Composition-Marker-vX.Y.Z-full.zip` | ~1.6 GB. A **first install**: the source plus `runtime\`, `bin\` and `mmproj-F16.gguf`. Only the two language models are left for `DOWNLOAD_MODELS.bat`, because each is past GitHub's 2 GB per-asset limit. |
+
+The tag must be `v` followed by exactly `APP_VERSION`, or the updater's own verification
+refuses the download -- which is the check that stops a mismatched zip being installed, so
+a forgotten version bump produces a release nobody can install. Never re-upload an asset
+onto a published release: GitHub's CDN serves the old bytes for some time afterwards, so
+some users get one zip and some the other from the same link. Bump the version instead.
 
 ---
 

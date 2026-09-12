@@ -17,12 +17,19 @@ APP_VERSION = "1.1.0"
 GITHUB_REPO = "NGJHD/Composition-Marker"
 REPO_URL = "https://github.com/%s" % GITHUB_REPO
 
-# Which asset on a release is the one to install. The release carries the
-# source only -- bin\, models\ and runtime\ are 23 GB of payload that an
-# update never needs to touch, because robocopy leaves what it does not carry
-# alone. The tag must match APP_VERSION exactly or the updater refuses the
-# download rather than installing a version that disagrees with its own label.
-ASSET_SUFFIX = "-source.zip"
+# A release carries two zips and they are not variants of the same thing:
+#
+#   Composition-Marker-vX.Y.Z.zip        the source tree, ~150 KB
+#   Composition-Marker-vX.Y.Z-full.zip   the same plus runtime\, bin\ and mmproj
+#
+# The small one is the update payload. It must never contain runtime\python.exe:
+# the updater would be overwriting the interpreter the running app is executing
+# from, and a half-copied interpreter cannot start, so it cannot self-repair.
+# pick_asset skips anything carrying this marker for exactly that reason.
+#
+# The full one is for a first install: unzip it and only the two language models
+# are left to download.
+FULL_ASSET_MARKER = "-full"
 
 
 def parse_version(text: str):
@@ -41,3 +48,22 @@ def is_newer(candidate: str, current: str = APP_VERSION) -> bool:
     if a is None or b is None:
         return False
     return a > b
+
+
+def pick_asset(assets: list):
+    """The source zip attached to a release -- the update payload.
+
+    Anything carrying FULL_ASSET_MARKER is a first-install bundle and is
+    skipped. Any other ambiguity is refused rather than guessed at: offering
+    the wrong asset would overwrite an install with something unintended.
+
+    A release carrying only a full bundle yields nothing, which is the correct
+    answer -- "nothing to install" rather than "install the 1.6 GB one over the
+    interpreter you are running".
+    """
+    zips = [a for a in (assets or [])
+            if str(a.get("name", "")).lower().endswith(".zip")
+            and a.get("browser_download_url")]
+    updates = [a for a in zips
+               if FULL_ASSET_MARKER not in str(a.get("name", "")).lower()]
+    return updates[0] if len(updates) == 1 else None
