@@ -1,49 +1,33 @@
-Copy out this page of a child's handwritten composition, word for word.
+You are copying out a page of a child's handwritten composition, exactly as it
+is written, so that a teacher can mark it.
 
 This is page {{PAGE_INDEX}} of {{PAGE_TOTAL}}. The handwriting is {{LANGUAGE_NAME}}.
 
-PARAGRAPHS
+Copy the page out VERBATIM. That means:
 
-A new paragraph is marked by an indented first line -- ruled paper has no blank
-lines to spare, so the indent is the only signal there is. Write [P] before the
-first word of each indented line, and nowhere else. A page with no indented
-lines gets no [P], which is normal.
+- Keep every spelling mistake, every wrong tense, every missing or wrong
+  punctuation mark exactly as the child wrote it. You are not correcting
+  anything. A single corrected word makes the marking wrong, because the child
+  will be told they wrote something they did not write.
+- Keep the paragraph breaks. Start a new line where the child started a new
+  paragraph. Do not add paragraph breaks that are not there, and do not join
+  paragraphs together.
+- Do not preserve the line breaks within a paragraph. Where a word simply runs
+  off the end of a ruled line, join it up.
+- If there is a title or a heading at the top of the page, put it on its own
+  first line.
+- If a word has been crossed out, leave it out. If a word has been inserted
+  above the line with a caret, put it where the caret points.
+- If you genuinely cannot read a word, write [?] in its place. If you can make
+  a good guess, write your guess followed by [?] with no space, like this:
+  bicyle[?]. Do not guess at a whole sentence.
+- Do not add page numbers, do not add your own notes, and do not describe the
+  photograph.
 
-COPYING
-
-- Keep every spelling mistake, wrong tense and missing punctuation mark exactly
-  as the child wrote it. Correcting a single word makes the marking wrong,
-  because the child is then told they wrote something they did not write.
-- Join up a word that simply runs off the end of a ruled line.
-- Leave out anything crossed out. Honour a caret: put an inserted word where it
-  points.
-- Write [?] for a word you cannot read, or guess[?] for one you can nearly read.
-  Never guess at a whole sentence.
-- Copy only the child's own handwriting. Skip anything in red -- that is the
-  teacher's marking, not the composition. Skip the printed parts of a
-  worksheet, the Name and Class lines, and any faint writing showing through
-  from the back of the sheet.
-
-WHAT TO REPLY WITH
-
-The text of the page. Nothing else at all.
-
-Not a preamble, not "here is the text", not a note about the image or how it is
-oriented, not a comment on the handwriting, not a closing remark. Begin your
-reply with the child's first word and end it with their last one.
-
-ONE EXCEPTION, AND ONLY ONE
-
-If there is **no handwriting on the page at all** -- it is blank ruled paper,
-or a photograph of something that is not a page of writing -- reply with
-exactly:
+If this page does not contain any handwritten composition at all -- it is
+blank, or it is a photograph of something else -- reply with exactly:
 
 NO_TEXT_FOUND
 
-Be careful here. Most pages carry printed matter as well as the composition: a
-school name, a crest, Name and Class and Date lines, a Draft/Final box, a
-footer. **A page like that is a normal page and you must transcribe the
-handwriting on it.** Skipping the printed parts means leaving them out of your
-reply, not treating the page as empty.
-
-If you can see even one handwritten sentence, the page has a composition on it.
+Otherwise reply with the text of the page and nothing else. No preamble, no
+explanation, no closing remark.

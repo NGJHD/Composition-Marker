@@ -711,126 +711,54 @@ of them needs a model download; 5 and 6 need a phone.
 
 ---
 
-## 8a. Paragraph indentation cannot be recovered from these models
+## 8a. Paragraph indentation and red ink: tried, and withdrawn
 
-The most interesting negative result in this file.
+Both were asked for and both are gone again. Recorded here so nobody spends the
+afternoon on them twice.
 
-Singapore school compositions mark a new paragraph by **indenting the first
-line**. There is no blank line — ruled paper has none to spare. Every transcript
-was therefore coming back as one unbroken block, which is wrong twice over:
-Organisation is 20 of the 100 marks and paragraphing is most of it, and the
-corrected versions inherit the shape.
+**Paragraph indentation.** Singapore school compositions mark a new paragraph by
+indenting the first line; there is no blank line, because ruled paper has none
+to spare. So a transcript comes back as one unbroken block. Four approaches were
+tried: asking for a blank line, asking for a `[P]` marker, asking for one ruled
+line per output line with the indents preserved, and asking for nothing at all.
 
-Four approaches, on the operator's own photographed pages:
+The `[P]` marker worked on a clean blue-ink page — three of three indents, and
+the transcript came back correctly paragraphed — and not at all on a pencil page
+under heavy red annotation, on the low quantisation and the high one alike. The
+line-per-line version made the low model abandon the page and answer
+`NO_TEXT_FOUND`.
 
-| Asked for | IQ2_XXS | Q4_K_M |
-|---|---|---|
-| "put a blank line before an indented line" | one block | one block |
-| "write `[P]` before each indented line" | no markers at all | **no markers at all** |
-| "one ruled line per output line, four spaces for an indent" | **`NO_TEXT_FOUND`** — gave up entirely | not reached |
-| nothing about paragraphs | one block | one block |
+Partial and unpredictable, so withdrawn. What replaces it is one instruction in
+`mark.txt`: **the marking may not comment on or deduct for paragraphing, layout
+or neatness**, because none of it survives the reading, and `levels.marks_table`
+describes Organisation without naming paragraphs. That is the half worth having
+and it costs nothing — a report was observed asking why a composition was in one
+block, on a page that was properly paragraphed.
 
-**Corrected, after testing on a second composition: `[P]` does work, on some
-pages.** The table above was measured entirely on the red-marked pages, and
-generalising from them was wrong.
+**Red ink.** A teacher's marking should not become the child's words. Q4_K_M
+managed the easy half — it ignored marginal comments and an inserted word — but
+still absorbed a correction written directly over a word, taking the teacher's
+`exploded` for the child's `exploding`. IQ2_XXS copied the teacher's closing
+comment into the composition, and the instruction destabilised it badly: on one
+page it transcribed correctly to the end, emitted a hallucinated closing tag,
+and continued *"Wait, I need to re-examine the image. Let us look at the red
+ink. Line 1: … Line 2: …"* before locking into a repetition loop. Another run
+opened by announcing that the image was rotated 90 degrees, which it was not.
 
-On a clean two-page script in blue ink, IQ2_XXS emitted `[P]` three times on
-page 1 and the transcript came back correctly broken into three paragraphs at
-exactly the child's indents. On page 2 of the same composition it missed the
-one indent there. So:
+Withdrawn at the operator's call — it was a nice-to-have, and the guards it
+needed (deliberation trimming, repetition truncation, a widened preamble
+stripper) were more code than the feature was worth. All of it is gone.
 
-| Page | Markers |
-|---|---|
-| Blue ink, clean, printed school header | 3 of 3 |
-| Blue ink, page 2 of the same script | 0 of 1 |
-| Pencil, heavy red teacher annotation | 0 of 3 |
+**The lesson worth keeping is about prompt length.** The transcription prompt
+had grown to four times its original size, one well-meant rule at a time, and
+every failure above appeared only after it did — including a page silently
+dropped half the time, because a rule about skipping printed worksheet headers
+led the model to call the whole sheet blank. A 2-bit model cannot hold a long
+instruction. The reliable prompt is the short one, and it is back to what it was.
 
-Partial, and better on a clean page than a marked-up one — which is what you
-would expect if the model is attending to the left edge but losing it among
-other marks. `_apply_para_marks` honours both `[P]` and genuine leading
-indentation, so whatever the model does report is used.
-
-The honest summary is that paragraphing is recovered often enough to be worth
-having and not reliably enough to be judged on, which is exactly why §8c exists.
-
-If it needs to be reliable, the browser route stands: it already draws every
-page to a canvas to resize it, so it could measure the leftmost dark pixel per
-text row and send the paragraph positions with the image. Deterministic, no new
-dependency, and not subject to any of this.
-
-The real fix, if it is wanted, is to stop asking: the browser already draws
-every page to a canvas to resize it, so it could find the leftmost dark pixel
-per text row, detect which rows start further in, and send the paragraph
-positions along with the image. That is deterministic pixel measurement rather
-than a model judgement, it needs no new Python dependency, and it is the only
-approach here that does not depend on the model noticing something it has
-demonstrated twice that it does not notice.
-
-## 8c. A whole page silently dropped, about half the time
-
-Reported as "the transcript only reads page 2", and it was a regression from the
-red-ink work in the same session.
-
-The model was replying **`NO_TEXT_FOUND` for page 1** — not a cleaning-pipeline
-fault, an actual refusal, on roughly every other run of the identical input.
-
-Page 1 is the one carrying the printed school worksheet header: crest, PALM VIEW
-PRIMARY SCHOOL, Name / Class / Subject / Date, a Draft/Final box. The new prompt
-told the model to skip printed matter, and it over-applied that to the whole
-sheet: a form, therefore not a composition, therefore empty.
-
-Two fixes, because the cause and the flakiness are separate problems:
-
-- The prompt now says plainly that most pages carry printed matter as well as
-  the composition, that such a page is a **normal** page, and that skipping the
-  printed parts means leaving them out of the reply rather than treating the
-  page as blank. Five consecutive runs afterwards: no page dropped, and the
-  retry below never fired.
-- A page declared empty is **asked again**, once, at a slightly higher
-  temperature. This is the only answer in the app that discards a page outright,
-  so it should have to be given twice.
-
-And a page rejected for any reason now logs what the model actually said. The
-whole diagnosis above took one line of log once that existed; before it, a
-dropped page and a genuinely blank sheet looked identical.
-
-## 8b. Two failures the red-ink instruction introduced
-
-Asked to ignore the teacher's red marking, IQ2_XXS did something new and bad:
-it transcribed the page correctly to the end, emitted a hallucinated closing
-tag, and then continued in the document channel —
-
-> `</washed>` Wait, I need to re-examine the image. The text is written in a
-> cursive hand. Let's look at the red ink. Line 1: … Line 2: …
-
-— before locking into repeating one sentence until the token cap. Thinking is
-off for this call, so there is no reasoning channel and all of it lands in the
-transcript. A second run opened with *"The image is rotated 90 degrees
-clockwise"*, which is both a preamble and a hallucination.
-
-Three fixes, all code-side, because a prompt that says "do not write a preamble"
-was already there and was being ignored:
-
-- `_trim_deliberation` cuts the page at the first deliberation marker and logs
-  that it did. Everything before it is a good transcript, so the page is kept
-  rather than thrown away.
-- `_repetition_start` truncates at three identical sentences in a row.
-- The preamble stripper was widened from "here is the text:" to any short
-  opening line that ends in a colon and talks about the image rather than
-  being in it.
-
-And the prompt was cut back hard — it had grown to four times its original
-length with rules added one at a time, and length alone is what a 2-bit model
-cannot hold. After the trim, no leaks, no preamble, no repetition.
-
-**On red ink itself the result is partial and the operator has been told so.**
-Q4_K_M ignores marginal comments and inserted words correctly, but still
-absorbs a red correction written directly above a word (it wrote the teacher's
-`exploded` where the child wrote `exploding`). IQ2_XXS additionally copies the
-teacher's closing comment — "Good try Joshua, it needs a lot better" — into the
-composition. It is kept as one line of the prompt because it costs almost
-nothing and helps the high quality model; it is not reliable and is not
-presented as though it were.
+One line survives the episode: when a page is rejected, the log now says what
+the model actually replied. That turned the next bug from a mystery into a
+one-line diagnosis, and it is six lines of logging rather than cleaning.
 
 ## 9. Still not measured
 

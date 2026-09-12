@@ -118,37 +118,18 @@ def transcribe_pages(job: Job, server: llm.LlamaServer, cfg: dict) -> str:
             page_total=total,
             language_name=LANGUAGE_NAMES.get(job.language, "English"),
         )
-        parts = [
-            {"type": "text", "text": prompt},
-            {"type": "image_url", "image_url": {"url": llm.data_url(page)}},
-        ]
         text = server.chat(
-            parts,
+            [
+                {"type": "text", "text": prompt},
+                {"type": "image_url",
+                 "image_url": {"url": llm.data_url(page)}},
+            ],
             thinking=bool(thinking.get("transcribe", False)),
             max_tokens=max_tokens,
             temperature=0.2,          # copying, not composing
             top_p=0.9,
             stage="transcribe",
         )
-        # A page declared empty is worth one more look before it is believed.
-        #
-        # Measured on a real first page -- a school worksheet with a printed
-        # header above the composition -- the model answered NO_TEXT_FOUND on
-        # roughly half of otherwise identical runs, and the whole page vanished
-        # from the transcript in silence. A second attempt at a slightly higher
-        # temperature usually reads it. This is the one answer in the app that
-        # discards a page, so it should have to be given twice.
-        if _clean_page(text).upper().startswith(NO_TEXT):
-            job.log("page %d: the model called this page empty; looking again"
-                    % index)
-            text = server.chat(
-                parts,
-                thinking=bool(thinking.get("transcribe", False)),
-                max_tokens=max_tokens,
-                temperature=0.5,
-                top_p=0.9,
-                stage="transcribe-retry",
-            )
         elapsed = time.time() - started
         calibration.record(job.model_key, "transcribe_page", elapsed)
         job.page_index = index
@@ -159,17 +140,7 @@ def transcribe_pages(job: Job, server: llm.LlamaServer, cfg: dict) -> str:
         # piece into one block.
         cleaned = _clean_page(text)
         if cleaned != NO_TEXT:
-            cleaned, dropped = _trim_deliberation(cleaned)
-            if dropped:
-                job.log("page %d: the model started talking to itself; kept "
-                        "the %d words it transcribed first"
-                        % (index, len(cleaned.split())))
-            cut = _repetition_start(cleaned)
-            if cut > 0:
-                job.log("page %d: output began repeating itself; truncated"
-                        % index)
-                cleaned = cleaned[:cut].rstrip()
-            cleaned = _unwrap(_apply_para_marks(cleaned))
+            cleaned = _unwrap(cleaned)
         if cleaned == NO_TEXT or not cleaned:
             # Say what the model actually replied. A page dropped in silence is
             # indistinguishable from a blank sheet, and the two need completely
@@ -205,65 +176,6 @@ def _snippet(text: str, limit: int = 220) -> str:
 
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$")
 
-# A page where the model stopped copying and started arguing with itself.
-#
-# Observed on a real marked-up page: the transcript ran correctly to the end of
-# the composition, then emitted a hallucinated closing tag and continued
-# "Wait, I need to re-examine the image... Let's look at the red ink again.
-# Line 1: ... Line 2: ..." and finally locked into repeating one sentence until
-# the token cap. Thinking is off for this call, so there is no reasoning
-# channel for any of that to go to and it lands in the document.
-#
-# Everything before the first of these markers is a good transcript. Cutting
-# there keeps it rather than throwing the page away.
-_DELIBERATION = re.compile(
-    r"^\s*(?:"
-    r"</[a-z]+>"                       # a hallucinated closing tag
-    r"|(?:wait|hmm|hold on|actually|but wait)\b[,.]?\s"
-    r"|(?:let'?s|let me|i(?:'| a)?m going to|i need to|i should|i must)\s"
-    r"|(?:looking|re-?examining|re-?reading|checking) (?:at |the )"
-    r"|line\s*\d+\s*:"                 # "Line 1: ..." transcription-by-numbers
-    r"|(?:the )?red ink\b"
-    r"|note\s*:"
-    r")",
-    re.IGNORECASE | re.MULTILINE)
-
-
-def _trim_deliberation(text: str) -> tuple:
-    """Cut the page at the point the model stopped transcribing.
-
-    Returns (text, what was cut) so the caller can log that it happened --
-    silently discarding half a model's output is the kind of thing that should
-    be visible in the log when a transcript later looks short.
-    """
-    m = _DELIBERATION.search(text)
-    if not m or m.start() == 0:
-        # At position 0 there is nothing to keep, and the whole page is
-        # deliberation; leave it to the empty/NO_TEXT handling above.
-        return text, ""
-    return text[:m.start()].rstrip(), text[m.start():].strip()
-
-
-def _repetition_start(text: str, runs: int = 3) -> int:
-    """Where a sentence starts repeating itself, or -1.
-
-    A 2-bit model that cannot carry out an instruction will sometimes lock into
-    a loop rather than stop. Three identical sentences in a row is not writing.
-    """
-    parts = re.split(r"(?<=[.!?])\s+", text)
-    seen, run = None, 0
-    index = 0
-    for part in parts:
-        key = part.strip().lower()
-        if key and key == seen:
-            run += 1
-            if run >= runs - 1:
-                return max(index - len(part) * (runs - 1), 0)
-        else:
-            seen, run = key, 0
-        index += len(part) + 1
-    return -1
-
 
 def _clean_page(text: str) -> str:
     """Strip the wrappers a model reaches for even when told not to."""
@@ -271,22 +183,12 @@ def _clean_page(text: str) -> str:
     text = _FENCE.sub("", text).strip()
     if text.upper().startswith(NO_TEXT):
         return NO_TEXT
-    # A preamble survives the instruction not to write one, and it is always
-    # the same shape: one line, about the image rather than in it, ending in a
-    # colon. Seen as "Here is the text of the page:" and -- from a model that
-    # had also hallucinated the problem -- "The image is rotated 90 degrees
-    # clockwise. Reading the text as it appears, the composition is:".
+    # An occasional "Here is the text of the page:" survives the instruction.
     lines = text.splitlines()
-    if lines and _PREAMBLE.match(lines[0].strip()):
+    if lines and re.match(r"^(here (is|are)|the (page|text)|transcription)\b.*:$",
+                          lines[0].strip(), re.IGNORECASE):
         lines = lines[1:]
     return "\n".join(lines).strip()
-
-
-_PREAMBLE = re.compile(
-    r"^(?=.{0,200}:\s*$)"                      # one short line ending in a colon
-    r".*\b(here (is|are)|image|photo|photograph|page|text|transcription|"
-    r"composition|handwriting|rotated|as follows)\b",
-    re.IGNORECASE)
 
 
 def _size_of(text: str, language: str) -> str:
@@ -299,48 +201,6 @@ def _size_of(text: str, language: str) -> str:
     if language == "zh":
         return "%d characters" % len(_CJK.findall(text))
     return "%d words" % len(text.split())
-
-
-# The paragraph marker the transcription prompt asks for. A model will not
-# reliably emit a blank line for an indent it can see -- whitespace is too easy
-# to lose on the way out -- but it will emit a token, and a token survives.
-_PARA_MARK = re.compile(r"[ \t]*\[\s*P\s*\][ \t]*", re.IGNORECASE)
-
-
-def _apply_para_marks(text: str) -> str:
-    """Turn indented lines, and any [P] markers, into paragraph breaks.
-
-    Singapore school compositions indent a new paragraph rather than leaving a
-    blank line, so there is nothing in the layout for a model to copy: asked
-    for "the paragraph breaks" it returns one unbroken block, and asked to mark
-    each indented line with [P] it returns no markers at all -- on the low
-    quantisation and the high one alike.
-
-    What it will do is copy the page a ruled line at a time and indent the
-    lines that are indented. That is a smaller thing to ask: transcribe what is
-    there, rather than interpret what it means. The interpretation happens
-    here, where it is deterministic.
-
-    [P] is still honoured for a model that offers it.
-    """
-    text = _PARA_MARK.sub("\n\n", text)
-
-    lines = text.split("\n")
-    # Only trust leading whitespace when some lines have it and others do not.
-    # A model that indents everything, or nothing, has told us nothing.
-    indented = [bool(re.match(r"[ \t]{2,}\S", ln)) for ln in lines
-                if ln.strip()]
-    if any(indented) and not all(indented):
-        out = []
-        for ln in lines:
-            if not ln.strip():
-                continue
-            if re.match(r"[ \t]{2,}\S", ln) and out:
-                out.append("")          # becomes a blank line, i.e. a break
-            out.append(ln.strip())
-        text = "\n".join(out)
-
-    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def _unwrap(text: str) -> str:

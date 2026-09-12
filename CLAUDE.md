@@ -240,18 +240,7 @@ The prompt is the load-bearing part. It must insist on:
 
 - Verbatim text, **including every spelling and grammar mistake**. A single silently
   corrected word makes the marking wrong.
-- **A new paragraph is an indented first line, not a blank one.** Singapore school
-  compositions are written on ruled paper with no blank line between paragraphs — the
-  child simply starts further in from the margin. A prompt that says "keep the paragraph
-  breaks" gets a single unbroken block back, because there are no breaks to keep in the
-  form the model is looking for. It has to be told to watch the left edge.
-- **Ignore everything written in red.** Red is the teacher's: ticks, crosses, circles,
-  corrections written over a word, marginal comments, a grade at the end. A teacher's
-  correction copied into the transcript hands the child a mark for work they did not do,
-  and hides the mistake they actually made. Ignore the printed parts of a worksheet too
-  — school name, crest, the Name/Class/Subject/Date lines — and bleed-through from the
-  reverse of the sheet.
-- Line breaks within a paragraph joined up.
+- Paragraph breaks preserved; line breaks within a paragraph joined up.
 - Crossed-out words omitted; carets honoured.
 - `[?]` for an unreadable word, `guess[?]` for a doubtful one, never a guessed sentence.
 - `NO_TEXT_FOUND` for a blank page or a photograph of something else.
@@ -259,13 +248,13 @@ The prompt is the load-bearing part. It must insist on:
 Strip code fences and the occasional "Here is the text of the page:" — models emit both
 despite being told not to.
 
-**Guard against the model arguing with itself in the output.** Thinking is off for this
-call, so there is no reasoning channel; when a page is hard, a small model transcribes
-correctly to the end and then continues *"Wait, I need to re-examine the image. Let's look
-at the red ink again. Line 1: … Line 2: …"* and finally locks into repeating one sentence
-until the token cap. Everything before the first such marker is a good transcript, so cut
-there and log that it happened rather than discarding the page — and truncate at three
-identical sentences in a row, which is never writing.
+**Keep this prompt short.** It grew to four times its length one well-meant rule at
+a time, and a 2-bit model cannot hold a long instruction: it began writing preambles,
+arguing with itself in the output, and calling a worksheet page blank. Every rule
+added here costs reliability on the rules already in it. See BUILD_NOTES section 8a.
+
+**When a page is rejected, log what the model actually replied.** A page dropped in
+silence is indistinguishable from a blank sheet, and the two need opposite responses.
 
 **Joining pages:** if the previous page ended without terminal punctuation, the sentence
 runs on and the pages are joined with a space. Otherwise with a blank line. Joining
