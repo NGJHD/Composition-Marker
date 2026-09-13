@@ -1113,8 +1113,9 @@ producing a perfectly acceptable grounded rewrite *without* reasoning.
 It is also the model chosen for the smallest cards, where ten thousand tokens of thinking
 before the first word of output is many minutes.
 
-So `hardware.MODELS` carries `rewrite_thinking`, true for IQ4_XS and false for IQ2_XXS,
-and `config.json` remains the master switch: setting `correct_improved` false turns it off
+So `hardware.MODELS` carries `rewrite_thinking`. **It was false for IQ2_XXS and is now
+true for both -- see 7.6r, which reverses this once the reasoning budget removed the
+premise.** `config.json` remains the master switch: setting `correct_improved` false turns it off
 for everything, setting it true does not turn it on for a model that cannot use it. The
 external Port option takes the configured default, since the operator chose it and knows
 what they are running.
@@ -1325,6 +1326,48 @@ fidelity as it is on size, which is what section 7.3 predicted.
 
 This confirms 7.3 rather than revising it: the step is between sub-4-bit and 4-bit, and
 IQ3 buys a little of both sides and enough of neither.
+
+### 7.6r IQ2_XXS gets its reasoning back, because the budget makes it safe
+
+Section 7.6m turned thinking off for IQ2_XXS's improved rewrite. The reasoning was
+unbounded, a 2-bit model could not hold a task together over ten thousand tokens, and
+section 8a records what that looked like: a hallucinated closing tag, the model arguing
+with itself in the output, a repetition loop.
+
+`llm.reasoning_budget` (7.6p) removes the premise. The reasoning is now bounded at 7,000
+tokens for every model, so the distance IQ2 has to hold a task over is a third of what it
+was, and the failure mode the veto guarded against is prevented at the server rather than
+avoided by declining to reason at all.
+
+So `rewrite_thinking` is True for both models, at the operator's instruction. What that
+buys is the thing section 8 asks for and 7.6g measured: **thinking is what holds the word
+ceiling.** Against a 399-word original and the 105% ceiling of 419:
+
+    thinking on     398, 409, 418          3 of 3 inside
+    thinking off    402, 341, 341, 456     1 of 4 inside
+
+Without it the rewrite came back 15% short twice and over the ceiling once, and both short
+runs opened with an invented title on a composition that has none. Turning it off for
+IQ2 traded a reliable overrun for an unreliable length, which was the right trade only
+while the overrun had no other fix.
+
+The per-model mechanism is kept rather than deleted even though both entries now say True.
+It is the right place to turn reasoning off for a future quantisation that cannot use it,
+and it records why one once could not. `thinking.correct_improved` in config.json remains
+the master switch: False there turns it off for everything, True does not turn it on for a
+model whose table entry says otherwise.
+
+**The arithmetic that makes this fit.** `max_improved_tokens` is 12,000 and the budget is
+7,000, so a full reasoning block plus a ~500-2,000 token rewrite lands inside the cap with
+room. Before the budget existed the same call reached 12,000 on reasoning alone and
+returned nothing -- on IQ4_XS and IQ3_XXS as well as IQ2_XXS, which is what made this a
+prompt problem rather than a quantisation one.
+
+**What it costs.** Up to 7,000 tokens of thinking on the model chosen for the smallest
+cards, where generation is slowest. On a 16 GB card at ~35 tok/s that is around three
+minutes; on the 8 GB card IQ2 exists for, with 18 FFN blocks in system RAM, it will be
+longer. That is the price of a rewrite that is the right length, and the operator's call
+to pay it.
 
 ## 8. Acceptance tests (CLAUDE.md section 14)
 

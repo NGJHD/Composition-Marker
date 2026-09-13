@@ -81,14 +81,21 @@ FFN_FRACTION = 0.67
 # is the right choice for a machine that cannot hold anything larger and the
 # wrong one for a machine that can, which is exactly what detection decides.
 # rewrite_thinking is a property of the quantisation, not a preference, which
-# is why it lives here rather than only in config.json. The improved rewrite
-# reasons for ten thousand tokens or more before it writes anything, and a
-# 2-bit model cannot hold a task together over that distance: section 8a of
-# BUILD_NOTES records IQ2_XXS emitting a hallucinated closing tag, arguing with
-# itself in the output and then locking into a repetition loop once its
-# instruction grew. Section 7.3 measured it producing a perfectly acceptable
-# grounded rewrite *without* reasoning. It is also the model chosen for the
-# smallest cards, where ten thousand tokens of thinking is many minutes.
+# is why it lives here rather than only in config.json.
+#
+# It was False for IQ2_XXS and is now True for both, at the operator's
+# instruction, because the thing it was guarding against has been fixed
+# somewhere better. The veto existed because the improved rewrite reasoned for
+# ten thousand tokens or more before writing anything and a 2-bit model could
+# not hold a task together over that distance -- BUILD_NOTES section 8a records
+# IQ2_XXS emitting a hallucinated closing tag, arguing with itself and locking
+# into a repetition loop. `llm.reasoning_budget` now bounds that reasoning at
+# the server, so the distance is short enough to hold and the rewrite gets the
+# thinking that section 8 asks for on every model. BUILD_NOTES section 7.6r.
+#
+# The mechanism is kept rather than deleted: it is the right place to turn
+# reasoning off for a future quantisation that cannot use it, and it records
+# why one once could not.
 MODELS = [
     {
         "key": "iq4_xs",
@@ -104,7 +111,7 @@ MODELS = [
         "label": "Low Quality: Qwen3.8-27B-UD-IQ2_XXS",
         "size_gb": 7.3,
         "min_vram_mb": 0,
-        "rewrite_thinking": False,
+        "rewrite_thinking": True,
     },
 ]
 
