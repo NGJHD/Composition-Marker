@@ -183,6 +183,18 @@ _DEFAULTS = {
         # weights carry one; "off" disables it. 1.77x measured, at 0.8 GB of
         # VRAM. BUILD_NOTES section 7.6i.
         "mtp": "auto",
+        # How many tokens the model may spend thinking before it has to start
+        # writing. 0 disables the cap and restores the old behaviour, in which
+        # max_tokens ends the generation mid-thought and the call returns
+        # nothing at all. 7,000 sits above every completed reasoning block
+        # measured -- IQ4_XS 4,083-4,309, IQ3_XXS ~6,300 -- and below the
+        # runaway that IQ2_XXS produced on every attempt. BUILD_NOTES 7.6p.
+        "reasoning_budget": 7000,
+        # Injected before the end-of-thinking tag when the budget runs out, so
+        # stopping reads as the model's own decision rather than an amputation.
+        "reasoning_budget_message":
+            "That is enough analysis. I will now write the final answer in "
+            "the required format.",
         # NOT 8080. That is llama.cpp's own default, so it is exactly the port
         # an operator's own llama-server will be sitting on -- and the Port
         # option in the model dropdown exists to talk to one of those. Two

@@ -10,6 +10,8 @@
     "mmproj": "mmproj-F16.gguf",
     "mmproj_offload": "auto",
     "mtp": "auto",
+    "reasoning_budget": 7000,
+    "reasoning_budget_message": "That is enough analysis. I will now write the final answer in the required format.",
     "port": 8719,
     "startup_timeout_s": 240,
     "max_transcribe_tokens": 2000,

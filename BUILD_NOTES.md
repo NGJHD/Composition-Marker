@@ -1218,6 +1218,114 @@ whose zip is not this application, and a version mismatch between the download a
 are all handled in code and none has been exercised against a real release. The mismatch
 one is the load-bearing check -- it is what stops a wrong or tampered zip being installed.
 
+### 7.6p A ceiling on thinking, which is not a ceiling on the answer
+
+Section 7.6g recorded the improved rewrite spending its whole budget on reasoning and
+returning nothing, and called the reasoning "unbounded" because no value of
+`max_improved_tokens` inside a 16k context contained it. That was the wrong lever, and
+llama.cpp already has the right one.
+
+    --reasoning-budget N          token budget for thinking: -1 unrestricted,
+                                  0 immediate end, N>0 budget (default: -1)
+    --reasoning-budget-message    injected before the end-of-thinking tag when
+                                  the budget is exhausted
+
+`max_tokens` bounds the **generation**. When it runs out mid-thought the generation simply
+ends, `content` is empty, and a truncation presents as total failure -- which is why the
+retry-without-thinking path existed at all. `--reasoning-budget` bounds the **thinking**:
+it closes the block and lets the model write the answer it was going to write.
+
+We were passing neither, so thinking was unrestricted by default.
+
+#### Two different overruns, one flag
+
+Measured on the same 400-word P4 script, same two photographs:
+
+| | marking | improved rewrite |
+|---|---|---|
+| IQ4_XS | 4,083-4,309, fine | **12,000, failed** |
+| IQ3_XXS | ~6,300, fine | **12,000, failed** |
+| IQ2_XXS | **12,000 and 9,569, both failed** | **failed** |
+
+The marking overrun is IQ2's alone and scales with quantisation. The rewrite overrun
+happens on **every quant tried**, which makes it the prompt rather than the weights -- so
+no choice of model fixes it, and a per-model setting never could.
+
+#### Measured with the budget in force
+
+IQ2_XXS, which had overrun on every previous attempt:
+
+| | reasoning | outcome | marking wall |
+|---|---|---|---|
+| unrestricted, run 1 | 12,000 capped | nothing, retried | ~377 s |
+| unrestricted, run 2 | 9,569 then failed | nothing, retried | -- |
+| **budget 6,000** | **~6,000, closed** | **2,272-token report, 81/100** | **234 s** |
+
+and on the same run the rewrite, which had failed on every quant, closed at ~5,400 and
+wrote 504 tokens -- **401 words against a 401-word original**, dead centre of the 95-105%
+band, so the length check in 7.6l never had to fire. Fixing the cause rather than catching
+the symptom.
+
+**Three gains, and the second matters more than the first.** About 40% faster, because
+nothing is generated and then discarded. The report is now produced *with* reasoning --
+every previous overrun fell through to a thinking-off retry, so CLAUDE.md section 7's "the
+one place in the app where reasoning earns its cost" was silently not happening on those
+runs. And the rewrite lands in range on its own.
+
+#### Why 7,000, and why a server flag
+
+7,000 sits above every reasoning block that completed on its own -- IQ4_XS at 4,083-4,309,
+IQ3_XXS at ~6,300 -- and below the runaway. 6,000 was tested and worked; 7,000 gives the
+larger quants room on a longer composition, at the cost of a few more seconds on IQ2.
+
+It is a server flag rather than a per-call one, which sounds coarse and is not:
+transcription and the minimal correction both run with thinking off, so there is no
+reasoning for a budget to bound there. One value therefore covers exactly the two calls
+that reason.
+
+**It does not apply to the Port option.** That server belongs to the operator and this
+process does not set its flags; an operator who wants the same behaviour passes the flag
+themselves.
+
+#### What this does not fix
+
+The budget bounds reasoning. It does nothing for transcription fidelity, which is where
+IQ2's real problem is: the run before this one opened the transcript with a leaked
+preamble, *"I have to say, I am not sure I can read this. Let me try."*, and the run after
+it opened with a stray `I` before the first word. `pipeline._clean_page` strips a first
+line only when it both begins with "here is/are", "the page/text" or "transcription" and
+ends in a colon, so neither was caught. That is the section 8a instability, it is
+untouched by any of this, and it is the more damaging of the two faults because a preamble
+in the transcript is marked as though the child wrote it.
+
+### 7.6q IQ3_XXS is not a Low Quality option
+
+Tried at the operator's request as a possible replacement for IQ2_XXS. It marks cleanly --
+~6,300 reasoning tokens, no retry, 77/100 in 210 s -- and it carries the `blk.64` MTP
+layer that IQ2 lacks, so it reasons at 50 tok/s against IQ2's 35.
+
+It is still the wrong model for the job, for the reason the operator raised: Low Quality
+exists for an 8 GB card, and IQ3 does not fit one.
+
+| on 8,192 MiB | file | FFN blocks pushed to system RAM |
+|---|---|---|
+| IQ2_XXS | 7.27 GB | **18** |
+| IQ3_XXS | 10.93 GB | **44** |
+| IQ4_XS | 13.54 GB | 54 |
+
+44 of 64 blocks on the processor, plus MTP's ~0.8 GB of draft context, on the machines
+where IQ2 is chosen precisely because nothing larger fits. Its speed advantage is measured
+on a 16 GB card and would evaporate on the card that matters.
+
+Its transcript was 98.75% identical to IQ4's over 399 words, with four differences: it
+dropped a caret-inserted word (as IQ2 does and IQ4 does not), wrote `continually` for
+`continuously`, mis-rendered a misspelling differently, and correctly split a compound
+that IQ4 ran together. Two errors worse than IQ4, one better -- between the two on
+fidelity as it is on size, which is what section 7.3 predicted.
+
+This confirms 7.3 rather than revising it: the step is between sub-4-bit and 4-bit, and
+IQ3 buys a little of both sides and enough of neither.
+
 ## 8. Acceptance tests (CLAUDE.md section 14)
 
 | # | Test | Status |

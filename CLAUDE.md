@@ -486,12 +486,26 @@ bin\llama-cuda\llama-server.exe ^
   --parallel 1 ^
   --host 127.0.0.1 --port 8080 ^
   --no-webui ^
+  --reasoning-budget 7000 --reasoning-budget-message "..." ^
   --n-gpu-layers 99 --override-tensor "blk\.(NN|...|63)\.ffn_.*=CPU"
 ```
 
 The binary folder, the last line, and `--no-mmproj-offload` are decided at runtime.
 `--jinja` is required — without it llama.cpp uses a generic chat template and
 `chat_template_kwargs` has nothing to pass through to.
+
+**`--reasoning-budget` bounds the thinking; `max_tokens` bounds the generation, and they
+are not the same thing.** When `max_tokens` runs out mid-thought the generation simply
+ends, `content` is empty, and a truncation presents as total failure — which is what the
+retry-without-thinking path in `llm.py` exists to catch. A reasoning budget closes the
+thinking block instead and lets the model write, with
+`--reasoning-budget-message` injected before the end-of-thinking tag so that stopping
+reads as the model's own decision. Without it the budget is `-1`, unrestricted.
+
+It is a server flag rather than a per-call one, which covers exactly the right two calls:
+transcription and the minimal correction run with thinking off, so there is no reasoning
+to bound there. It is **not** applied to the Port option — that server is the operator's
+and this process does not set its flags. See BUILD_NOTES §7.6p for the measurements.
 
 Poll `GET /health` until ready. First load off a cold disk takes 60–120 seconds; surface
 it as *"Loading the language model…"* with a bar that keeps moving, or it looks hung.

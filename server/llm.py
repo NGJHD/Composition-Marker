@@ -219,6 +219,37 @@ class LlamaServer:
                 and layers != "0"
                 and hardware.model_has_mtp(model)):
             cmd += ["--spec-type", "draft-mtp"]
+
+        # A ceiling on thinking, which is not the same thing as a ceiling on
+        # the answer. max_tokens covers both and cuts the generation dead when
+        # it runs out -- mid-thought, before a word of the report exists -- so
+        # `content` comes back empty and a truncation presents as total
+        # failure. --reasoning-budget closes the thinking block instead and
+        # lets the model write, with the message below injected before the
+        # end-of-thinking tag so it reads as the model's own decision to stop.
+        #
+        # Measured on IQ2_XXS, which overran on every attempt without it:
+        #
+        #   unrestricted   12,000 capped -> no answer, retried    ~377s
+        #   budget 6,000   ~6,000 closed -> a 2,272-token report   234s
+        #
+        # It is deliberately a server flag rather than per call. Transcription
+        # and the minimal correction both run with thinking off, so there is no
+        # reasoning for it to bound there, which makes one value cover exactly
+        # the two calls that reason: the marking and the improved rewrite.
+        #
+        # Not applied to the Port option: that server belongs to the operator
+        # and this process does not set its flags.
+        budget = self.llm.get("reasoning_budget", 0)
+        try:
+            budget = int(budget)
+        except (TypeError, ValueError):
+            budget = 0
+        if budget > 0:
+            cmd += ["--reasoning-budget", str(budget)]
+            message = str(self.llm.get("reasoning_budget_message", "") or "")
+            if message:
+                cmd += ["--reasoning-budget-message", message]
         return cmd
 
     def start(self) -> None:
